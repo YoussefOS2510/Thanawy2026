@@ -191,7 +191,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-black text-white tracking-wide uppercase flex items-center gap-2">
-              Pearson Specter <span className="text-indigo-400 font-normal text-sm lowercase border border-indigo-500/25 px-2 py-0.5 rounded-full bg-indigo-500/5">score tracker</span>
+              Suits Scoring <span className="text-indigo-400 font-normal text-sm lowercase border border-indigo-500/25 px-2 py-0.5 rounded-full bg-indigo-500/5">score tracker</span>
             </h1>
             <p className="text-xs text-slate-400">Interactive Game Master Dashboard for 8 Legal Firms</p>
           </div>

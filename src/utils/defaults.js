@@ -61,12 +61,12 @@ export const DEFAULT_CONFIG = {
 };
 
 export const DEFAULT_TEAMS = [
-  { id: "team1", name: "Pearson Specter", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team2", name: "Zane Specter Litt", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team3", name: "Rand Kaldor Zane", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team4", name: "Darby International", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team5", name: "Bratton Gould", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team6", name: "Robert Zane & Associates", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team7", name: "Rand & Kaldor", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team8", name: "Pearson Darby Litt", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] }
+  { id: "team1", name: "Team 1", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team2", name: "Team 2", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team3", name: "Team 3", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team4", name: "Team 4", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team5", name: "Team 5", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team6", name: "Team 6", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team7", name: "Team 7", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team8", name: "Team 8", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] }
 ];
