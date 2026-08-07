@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { listenToGameData, isFirebaseConnected, resetDatabaseToDefaults } from "./utils/db";
+import { listenToGameData, isFirebaseConnected, resetDatabaseToDefaults, isDemoMode, setDemoMode } from "./utils/db";
 import { validateCaseInputs } from "./utils/capacity";
 
 // Components
@@ -124,6 +124,14 @@ export default function App() {
             <Database className="h-4.5 w-4.5" />
             Set Up Firebase Connection
           </button>
+
+          <button
+            onClick={() => setDemoMode(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-3 text-sm font-bold text-slate-350 active:scale-98 transition"
+          >
+            <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
+            Start Offline Sandbox (Demo Mode)
+          </button>
         </div>
 
         <FirebaseConfigModal isOpen={isFirebaseOpen} onClose={() => setIsFirebaseOpen(false)} />
@@ -192,10 +200,17 @@ export default function App() {
         {/* Global Action controls */}
         <div className="flex items-center gap-3 flex-wrap">
           {/* Status badge */}
-          <div className="flex items-center gap-1.5 bg-emerald-500/5 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            Live Syncing
-          </div>
+          {isDemoMode() ? (
+            <div className="flex items-center gap-1.5 bg-amber-500/5 border border-amber-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-400">
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              Demo Mode (Offline)
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-emerald-500/5 border border-emerald-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Live Syncing
+            </div>
+          )}
 
           <button
             onClick={() => setIsFirebaseOpen(true)}
