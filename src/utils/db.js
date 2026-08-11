@@ -177,14 +177,14 @@ export function listenToGameData(onData, onError) {
     };
   }
 
-  // Primary RTDB if databaseURL configured
-  if (db) {
-    return listenToRTDB(onData, onError);
-  }
-
-  // Primary Firestore if only projectId configured
+  // Primary: Listen via Cloud Firestore
   if (firestoreDb) {
     return listenToFirestore(onData, onError);
+  }
+
+  // Fallback: Listen via Realtime Database
+  if (db) {
+    return listenToRTDB(onData, onError);
   }
 
   if (onError) onError(new Error("Firebase is not initialized. Please check your .env credentials."));
