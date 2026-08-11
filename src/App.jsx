@@ -93,51 +93,7 @@ export default function App() {
   const currentMarket = gameData?.gameState?.currentMarket || 1;
   const isGameOver = gameData?.gameState?.isGameOver || false;
 
-  // Unconfigured Landing Page
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-100 font-sans">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-slate-950 to-slate-950 z-0" />
-        
-        <div className="relative z-10 max-w-lg w-full rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl backdrop-blur-md space-y-6">
-          <div className="mx-auto rounded-2xl bg-indigo-500/10 p-4 text-indigo-400 w-fit animate-pulse border border-indigo-500/20">
-            <Trophy className="h-12 w-12 text-indigo-400" />
-          </div>
-          
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black tracking-tight text-white">
-              SUITS <span className="text-indigo-400">SCORING SYSTEM</span>
-            </h1>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Welcome, Game Master. This dashboard tracks assets, computes capacity limits, logs completed case revenues, and computes team rankings in real time.
-            </p>
-          </div>
 
-          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-amber-400 font-medium">
-            Database connection required. Please configure your Firebase Realtime Database setup credentials to begin.
-          </div>
-
-          <button
-            onClick={() => setIsFirebaseOpen(true)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white hover:bg-indigo-500 active:scale-98 transition shadow-lg shadow-indigo-600/20"
-          >
-            <Database className="h-4.5 w-4.5" />
-            Set Up Firebase Connection
-          </button>
-
-          <button
-            onClick={() => setDemoMode(true)}
-            className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 px-5 py-3 text-sm font-bold text-slate-350 active:scale-98 transition"
-          >
-            <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
-            Start Offline Sandbox (Demo Mode)
-          </button>
-        </div>
-
-        <FirebaseConfigModal isOpen={isFirebaseOpen} onClose={() => setIsFirebaseOpen(false)} />
-      </div>
-    );
-  }
 
   // Loading spinner
   if (loading) {

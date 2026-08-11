@@ -120,10 +120,10 @@ if (hasConfig && !isDemo) {
   }
 }
 
-export { db, firestoreDb };
+export { app, db, firestoreDb };
 
 export function isFirebaseConnected() {
-  return db !== null || firestoreDb !== null || isDemo;
+  return app !== null || firestoreDb !== null || db !== null || hasConfig || isDemo;
 }
 
 // Local storage listeners list for Demo Mode
