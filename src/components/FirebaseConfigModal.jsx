@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { getSavedFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseConnected } from "../utils/db";
-import { Database, Save, Trash2, X, RefreshCw } from "lucide-react";
+import { getSavedFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseConnected, resetDatabaseToDefaults } from "../utils/db";
+import { Database, Save, Trash2, X, RefreshCw, Send } from "lucide-react";
 
 export default function FirebaseConfigModal({ isOpen, onClose }) {
   const [config, setConfig] = useState(getSavedFirebaseConfig());
   const [error, setError] = useState(null);
+  const [syncing, setSyncing] = useState(false);
   const isConnected = isFirebaseConnected();
 
   if (!isOpen) return null;
@@ -12,6 +13,21 @@ export default function FirebaseConfigModal({ isOpen, onClose }) {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setConfig((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleForceSync = async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      await resetDatabaseToDefaults();
+      alert("Successfully written initial data to Cloud Firestore! Check your Firebase console under collection 'suits-scoring'.");
+    } catch (err) {
+      console.error(err);
+      setError("Firestore write failed: " + (err.message || err));
+      alert("Firestore Sync Error: " + (err.message || err));
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleSave = (e) => {
@@ -179,19 +195,28 @@ export default function FirebaseConfigModal({ isOpen, onClose }) {
             </div>
           </details>
 
-          <div className="flex gap-3 border-t border-slate-800 pt-5 mt-6 justify-between">
-            {isConnected ? (
+          <div className="flex gap-3 border-t border-slate-800 pt-5 mt-6 justify-between flex-wrap">
+            <div className="flex gap-2">
+              {isConnected && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 px-3 py-2.5 text-xs font-semibold text-rose-400 hover:bg-rose-500/20 active:scale-95 transition"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Clear Local Storage
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleClear}
-                className="flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 text-sm font-semibold text-rose-400 hover:bg-rose-500/20 active:scale-95 transition"
+                onClick={handleForceSync}
+                disabled={syncing}
+                className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 active:scale-95 transition disabled:opacity-50"
               >
-                <Trash2 className="h-4 w-4" />
-                Clear Config
+                <Send className="h-4 w-4" />
+                {syncing ? "Writing to Firebase..." : "Force Seed Firebase Database"}
               </button>
-            ) : (
-              <div />
-            )}
+            </div>
             
             <div className="flex gap-3">
               <button

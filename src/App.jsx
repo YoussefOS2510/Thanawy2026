@@ -12,7 +12,7 @@ import TeamOverrideModal from "./components/TeamOverrideModal";
 import MarketTransitionModal from "./components/MarketTransitionModal";
 
 // Icons
-import { Database, Settings, ArrowRight, Trophy, Sparkles, RefreshCw, Activity, Layers, HelpCircle, ShieldAlert } from "lucide-react";
+import { Database, Settings, ArrowRight, Trophy, Sparkles, RefreshCw, Activity, Layers, HelpCircle, ShieldAlert, CloudUpload } from "lucide-react";
 
 export default function App() {
   const [gameData, setGameData] = useState(null);

@@ -2,6 +2,17 @@ import React, { useState } from "react";
 import { calculateNetWorth } from "../utils/capacity";
 import { Award, DollarSign, Briefcase, TrendingUp } from "lucide-react";
 
+const COLOR_BADGES = {
+  beige: "bg-amber-400/20 text-amber-200 border-amber-400/30",
+  green: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  turquoise: "bg-teal-400/20 text-teal-300 border-teal-400/30",
+  red: "bg-rose-500/20 text-rose-400 border-rose-500/30",
+  purple: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  orange: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  yellow: "bg-yellow-400/20 text-yellow-300 border-yellow-400/30",
+  blue: "bg-blue-500/20 text-blue-400 border-blue-500/30"
+};
+
 export default function Leaderboard({ teams, config }) {
   const [rankBy, setRankBy] = useState("netWorth"); // "cash" or "netWorth"
 
@@ -87,10 +98,17 @@ export default function Leaderboard({ teams, config }) {
                 </div>
                 
                 <div className="truncate">
-                  <span className="font-bold text-slate-100 text-sm block truncate group-hover:text-indigo-400">
-                    {team.name}
-                  </span>
-                  <span className="text-[10px] text-slate-400 flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-bold text-slate-100 text-sm truncate">
+                      {team.name}
+                    </span>
+                    {team.color && (
+                      <span className={`text-[9px] font-bold uppercase border px-1.5 py-0.2 rounded shrink-0 ${COLOR_BADGES[team.color] || "bg-slate-800 text-slate-400"}`}>
+                        {team.color}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 flex items-center gap-2 mt-0.5">
                     <span>Lvl {team.assets?.certLevel || 0} Cert</span>
                     <span>•</span>
                     <span>{team.assets?.desks || 0} Desks</span>

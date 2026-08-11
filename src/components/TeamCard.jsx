@@ -1,7 +1,18 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { updateTeam, logActivity } from "../utils/db";
 import { getTotalEmployees, getTotalEmployeeCapacity, getWorkingCapacity, getSolvableMarketCeiling, validateCaseInputs } from "../utils/capacity";
-import { Users, Layout, Award, Tv, Sofa, Monitor, Plus, AlertCircle, Edit, DollarSign } from "lucide-react";
+import { Users, Layout, Award, Tv, Sofa, Monitor, Plus, AlertCircle, Edit, DollarSign, Save, Check, RefreshCw } from "lucide-react";
+
+const COLOR_THEMES = {
+  beige: { border: "border-amber-200/40", text: "text-amber-200", bg: "bg-amber-400", badge: "bg-amber-400/10 text-amber-300 border-amber-400/30" },
+  green: { border: "border-emerald-500/40", text: "text-emerald-400", bg: "bg-emerald-400", badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+  turquoise: { border: "border-teal-400/40", text: "text-teal-300", bg: "bg-teal-400", badge: "bg-teal-400/10 text-teal-300 border-teal-400/30" },
+  red: { border: "border-rose-500/40", text: "text-rose-400", bg: "bg-rose-400", badge: "bg-rose-500/10 text-rose-400 border-rose-500/30" },
+  purple: { border: "border-purple-500/40", text: "text-purple-400", bg: "bg-purple-400", badge: "bg-purple-500/10 text-purple-400 border-purple-500/30" },
+  orange: { border: "border-orange-500/40", text: "text-orange-400", bg: "bg-orange-400", badge: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
+  yellow: { border: "border-yellow-400/40", text: "text-yellow-300", bg: "bg-yellow-400", badge: "bg-yellow-400/10 text-yellow-300 border-yellow-400/30" },
+  blue: { border: "border-blue-500/40", text: "text-blue-400", bg: "bg-blue-400", badge: "bg-blue-500/10 text-blue-400 border-blue-500/30" }
+};
 
 export default function TeamCard({ team, config, currentMarket, onOverride }) {
   const currentPrices = config.prices[`market${currentMarket}`];
@@ -17,10 +28,18 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
   const workingCapacity = getWorkingCapacity(assets);
   const solvableCeiling = getSolvableMarketCeiling(assets, certLimits);
 
-  const casesLogged = team.casesLogged || { type1: 0, type2: 0, type3: 0 };
-  
-  // Validation for UI
-  const validation = validateCaseInputs(assets, certLimits, casesLogged);
+  const [localCases, setLocalCases] = useState(team.casesLogged || { type1: 0, type2: 0, type3: 0 });
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (team.casesLogged) {
+      setLocalCases(team.casesLogged);
+    }
+  }, [team.casesLogged]);
+
+  // Validation for UI using local cases
+  const validation = validateCaseInputs(assets, certLimits, localCases);
 
   const handlePurchase = async (itemKey, cost, itemName) => {
     if (cash < cost) {
@@ -79,15 +98,26 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
     }
   };
 
-  const handleCasesChange = async (type, value) => {
+  const handleCasesChange = (type, value) => {
     const parsed = Math.max(0, parseInt(value || 0, 10));
-    const newCasesLogged = { ...casesLogged, [type]: parsed };
+    setLocalCases(prev => ({ ...prev, [type]: parsed }));
+  };
+
+  const handleSaveTeam = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
     try {
       await updateTeam(team.id, {
-        casesLogged: newCasesLogged
+        casesLogged: localCases
       });
+      await logActivity(`Saved team data and logged cases for "${team.name}".`);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
       console.error(err);
+      alert("Failed to save team: " + err.message);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -99,19 +129,29 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
   const isAtEmployeeLimit = totalEmployees >= maxEmployees;
   const isAtDeskLimit = totalEmployees >= (assets.desks || 0);
 
+  // Color Theme definitions
+  const theme = COLOR_THEMES[team.color] || {
+    border: "border-slate-800",
+    text: "text-indigo-400",
+    bg: "bg-indigo-500/10",
+    badge: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+  };
+
   return (
-    <div className="relative rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg backdrop-blur hover:border-indigo-500/40 transition-all duration-300 flex flex-col justify-between group h-full">
+    <div className={`relative rounded-2xl border ${theme.border} bg-slate-900/60 p-5 shadow-lg backdrop-blur hover:border-slate-700 transition-all duration-300 flex flex-col justify-between group h-full`}>
       
       {/* Top Banner & Title */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="truncate pr-2">
-            <h3 className="text-lg font-bold text-white tracking-wide group-hover:text-indigo-400 transition-colors truncate">
+            <h3 className={`text-lg font-extrabold tracking-wide transition-colors truncate ${theme.text}`}>
               {team.name}
             </h3>
-            <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
-              Firm Status
+            <span className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+              <span className={`h-2 w-2 rounded-full ${theme.bg}`} />
+              <span className={`text-[10px] font-bold uppercase border px-1.5 py-0.5 rounded ${theme.badge}`}>
+                {team.color || "Firm"}
+              </span>
             </span>
           </div>
           
@@ -387,7 +427,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Tv className="h-3.5 w-3.5 text-indigo-400" /> T1</span>
             <input
               type="number"
-              value={casesLogged.type1 || ""}
+              value={localCases.type1 || ""}
               onChange={(e) => handleCasesChange("type1", e.target.value)}
               className="w-16 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
               min="0"
@@ -395,7 +435,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             <span className="text-slate-600 text-xs">x</span>
             <span className="text-xs text-slate-400 font-mono">${caseRevenues.type1.toLocaleString()}</span>
             <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-              +${((casesLogged.type1 || 0) * caseRevenues.type1).toLocaleString()}
+              +${((localCases.type1 || 0) * caseRevenues.type1).toLocaleString()}
             </span>
           </div>
 
@@ -403,7 +443,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Sofa className="h-3.5 w-3.5 text-pink-400" /> T2</span>
             <input
               type="number"
-              value={casesLogged.type2 || ""}
+              value={localCases.type2 || ""}
               onChange={(e) => handleCasesChange("type2", e.target.value)}
               className="w-16 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
               min="0"
@@ -411,7 +451,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             <span className="text-slate-600 text-xs">x</span>
             <span className="text-xs text-slate-400 font-mono">${caseRevenues.type2.toLocaleString()}</span>
             <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-              +${((casesLogged.type2 || 0) * caseRevenues.type2).toLocaleString()}
+              +${((localCases.type2 || 0) * caseRevenues.type2).toLocaleString()}
             </span>
           </div>
 
@@ -419,7 +459,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Monitor className="h-3.5 w-3.5 text-cyan-400" /> T3</span>
             <input
               type="number"
-              value={casesLogged.type3 || ""}
+              value={localCases.type3 || ""}
               onChange={(e) => handleCasesChange("type3", e.target.value)}
               className="w-16 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
               min="0"
@@ -427,7 +467,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             <span className="text-slate-600 text-xs">x</span>
             <span className="text-xs text-slate-400 font-mono">${caseRevenues.type3.toLocaleString()}</span>
             <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-              +${((casesLogged.type3 || 0) * caseRevenues.type3).toLocaleString()}
+              +${((localCases.type3 || 0) * caseRevenues.type3).toLocaleString()}
             </span>
           </div>
         </div>
@@ -443,6 +483,37 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
             ))}
           </div>
         )}
+
+        {/* Save Team Button */}
+        <div className="mt-4 pt-3 border-t border-slate-800/60">
+          <button
+            type="button"
+            onClick={handleSaveTeam}
+            disabled={isSaving}
+            className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4 text-xs font-bold transition duration-200 active:scale-95 shadow-md ${
+              saveSuccess
+                ? "bg-emerald-600 text-white border border-emerald-500"
+                : "bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/30"
+            } disabled:opacity-50`}
+          >
+            {isSaving ? (
+              <>
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Saving to Database...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-white" />
+                Saved to Database!
+              </>
+            ) : (
+              <>
+                <Save className="h-3.5 w-3.5" />
+                Save {team.name} Data
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
     </div>
