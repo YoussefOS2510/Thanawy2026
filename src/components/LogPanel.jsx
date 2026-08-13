@@ -1,5 +1,5 @@
 import React from "react";
-import { Terminal, Calendar } from "lucide-react";
+import { Terminal } from "lucide-react";
 
 export default function LogPanel({ logs }) {
   // Convert logs object to array and sort by timestamp desc

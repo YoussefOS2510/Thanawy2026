@@ -1,7 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { updateTeam, logActivity } from "../utils/db";
-import { getTotalEmployees, getTotalEmployeeCapacity, getWorkingCapacity, getSolvableMarketCeiling, validateCaseInputs } from "../utils/capacity";
-import { Users, Layout, Award, Tv, Sofa, Monitor, Plus, AlertCircle, Edit, DollarSign, Save, Check, RefreshCw } from "lucide-react";
+import {
+  getTotalEmployees,
+  getEffectiveDeskAssignments,
+  getWorkingCapacity,
+  getSolvableMarketCeiling,
+  calculateOptimalCases,
+  validateCaseInputs
+} from "../utils/capacity";
+import {
+  Users,
+  Layout,
+  Award,
+  Tv,
+  Sofa,
+  Monitor,
+  Plus,
+  Minus,
+  AlertCircle,
+  Edit,
+  Save,
+  Check,
+  RefreshCw,
+  TrendingUp,
+  Zap,
+  CheckCircle2,
+  Armchair
+} from "lucide-react";
 
 const COLOR_THEMES = {
   beige: { border: "border-amber-200/40", text: "text-amber-200", bg: "bg-amber-400", badge: "bg-amber-400/10 text-amber-300 border-amber-400/30" },
@@ -14,23 +39,38 @@ const COLOR_THEMES = {
   blue: { border: "border-blue-500/40", text: "text-blue-400", bg: "bg-blue-400", badge: "bg-blue-500/10 text-blue-400 border-blue-500/30" }
 };
 
-export default function TeamCard({ team, config, currentMarket, onOverride }) {
-  const currentPrices = config.prices[`market${currentMarket}`];
-  const maxEmployees = config.maxEmployees;
-  const certLimits = config.certLimits;
-  const caseRevenues = config.caseRevenues;
+export default function TeamCard({ team, config, onOverride }) {
+  const maxEmployees = config?.maxEmployees || 5;
+  const certLimits = config?.certLimits || { 0: 0, 1: 3, 2: 5, 3: 8, 4: 12, 5: 18 };
+  const caseRevenues = config?.caseRevenues || { type1: 7500, type2: 10000, type3: 15000 };
 
-  const assets = team.assets || { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 };
-  const cash = team.cash || 0;
+  const assets = team.assets || {
+    empL1: 0,
+    empL2: 0,
+    empL3: 0,
+    desks: 0,
+    assignedEmpL1: undefined,
+    assignedEmpL2: undefined,
+    assignedEmpL3: undefined,
+    certLevel: 0,
+    tvCharges: 0,
+    couchCharges: 0,
+    computerCharges: 0
+  };
+  const profit = team.profit !== undefined ? team.profit : (team.cash || 0);
 
   const totalEmployees = getTotalEmployees(assets);
-  const employeeCapacity = getTotalEmployeeCapacity(assets);
+  const deskInfo = getEffectiveDeskAssignments(assets);
   const workingCapacity = getWorkingCapacity(assets);
   const solvableCeiling = getSolvableMarketCeiling(assets, certLimits);
 
   const [localCases, setLocalCases] = useState(team.casesLogged || { type1: 0, type2: 0, type3: 0 });
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [autoSolveSuccess, setAutoSolveSuccess] = useState(false);
+  const [customProfitInput, setCustomProfitInput] = useState("");
+  const [isAdjustingProfit, setIsAdjustingProfit] = useState(false);
+  const [showDeskManager, setShowDeskManager] = useState(false);
 
   useEffect(() => {
     if (team.casesLogged) {
@@ -41,46 +81,77 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
   // Validation for UI using local cases
   const validation = validateCaseInputs(assets, certLimits, localCases);
 
-  const handlePurchase = async (itemKey, cost, itemName) => {
-    if (cash < cost) {
-      alert("Insufficient funds to purchase " + itemName);
-      return;
-    }
+  // Optimal cases solver preview
+  const optimalSolve = calculateOptimalCases(assets, certLimits, caseRevenues);
 
+  // Profit Adjustment handler (+ / -)
+  const handleAdjustProfit = async (amount) => {
+    const delta = Number(amount);
+    if (isNaN(delta) || delta === 0) return;
+
+    setIsAdjustingProfit(true);
+    const newProfit = profit + delta;
+
+    try {
+      await updateTeam(team.id, {
+        profit: newProfit,
+        cash: newProfit
+      });
+      await logActivity(
+        `Adjusted profit for "${team.name}" by ${delta >= 0 ? "+" : ""}$${delta.toLocaleString()} (Current Profit: $${newProfit.toLocaleString()}).`
+      );
+      setCustomProfitInput("");
+    } catch (err) {
+      console.error(err);
+      alert("Failed to adjust profit: " + err.message);
+    } finally {
+      setIsAdjustingProfit(false);
+    }
+  };
+
+  // Add / Remove Asset (Free of charge, can buy employee without desk)
+  const handleModifyAsset = async (itemKey, delta, itemName) => {
     const updatedAssets = { ...assets };
-    let logMsg = "";
 
     switch (itemKey) {
       case "empL1":
-        if (totalEmployees >= maxEmployees) return;
-        if (totalEmployees >= assets.desks) return;
-        updatedAssets.empL1 = (updatedAssets.empL1 || 0) + 1;
+        if (delta > 0 && totalEmployees >= maxEmployees) return;
+        updatedAssets.empL1 = Math.max(0, (updatedAssets.empL1 || 0) + delta);
+        // Clean explicit desk assignment if employee count drops below assigned
+        if (updatedAssets.assignedEmpL1 !== undefined) {
+          updatedAssets.assignedEmpL1 = Math.min(updatedAssets.empL1, updatedAssets.assignedEmpL1);
+        }
         break;
       case "empL2":
-        if (totalEmployees >= maxEmployees) return;
-        if (totalEmployees >= assets.desks) return;
-        updatedAssets.empL2 = (updatedAssets.empL2 || 0) + 1;
+        if (delta > 0 && totalEmployees >= maxEmployees) return;
+        updatedAssets.empL2 = Math.max(0, (updatedAssets.empL2 || 0) + delta);
+        if (updatedAssets.assignedEmpL2 !== undefined) {
+          updatedAssets.assignedEmpL2 = Math.min(updatedAssets.empL2, updatedAssets.assignedEmpL2);
+        }
         break;
       case "empL3":
-        if (totalEmployees >= maxEmployees) return;
-        if (totalEmployees >= assets.desks) return;
-        updatedAssets.empL3 = (updatedAssets.empL3 || 0) + 1;
+        if (delta > 0 && totalEmployees >= maxEmployees) return;
+        updatedAssets.empL3 = Math.max(0, (updatedAssets.empL3 || 0) + delta);
+        if (updatedAssets.assignedEmpL3 !== undefined) {
+          updatedAssets.assignedEmpL3 = Math.min(updatedAssets.empL3, updatedAssets.assignedEmpL3);
+        }
         break;
       case "desk":
-        updatedAssets.desks = (updatedAssets.desks || 0) + 1;
+        updatedAssets.desks = Math.max(0, (updatedAssets.desks || 0) + delta);
         break;
       case "tv":
-        updatedAssets.tvCharges = (updatedAssets.tvCharges || 0) + 3;
+        updatedAssets.tvCharges = Math.max(0, (updatedAssets.tvCharges || 0) + (delta * 3));
         break;
       case "couch":
-        updatedAssets.couchCharges = (updatedAssets.couchCharges || 0) + 3;
+        updatedAssets.couchCharges = Math.max(0, (updatedAssets.couchCharges || 0) + (delta * 3));
         break;
       case "computer":
-        updatedAssets.computerCharges = (updatedAssets.computerCharges || 0) + 3;
+        updatedAssets.computerCharges = Math.max(0, (updatedAssets.computerCharges || 0) + (delta * 3));
         break;
       case "cert":
-        if (assets.certLevel >= 5) return;
-        updatedAssets.certLevel = (updatedAssets.certLevel || 0) + 1;
+        const nextLevel = (assets.certLevel || 0) + delta;
+        if (nextLevel < 0 || nextLevel > 5) return;
+        updatedAssets.certLevel = nextLevel;
         break;
       default:
         return;
@@ -88,14 +159,139 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
 
     try {
       await updateTeam(team.id, {
-        cash: cash - cost,
         assets: updatedAssets
       });
-      await logActivity(`"${team.name}" purchased ${itemName} for $${cost.toLocaleString()}.`);
+      await logActivity(
+        `"${team.name}" ${delta > 0 ? "added" : "removed"} ${itemName}.`
+      );
     } catch (err) {
       console.error(err);
-      alert("Purchase failed: " + err.message);
+      alert("Failed to update asset: " + err.message);
     }
+  };
+
+  // Adjust desk assignment for specific employee level
+  const handleAssignDesk = async (level, delta) => {
+    const totalDesks = assets.desks || 0;
+    const currentAssignments = {
+      empL1: deskInfo.assignedL1,
+      empL2: deskInfo.assignedL2,
+      empL3: deskInfo.assignedL3
+    };
+
+    const targetKey = level === 1 ? "empL1" : level === 2 ? "empL2" : "empL3";
+    const totalThisLevel = level === 1 ? (assets.empL1 || 0) : level === 2 ? (assets.empL2 || 0) : (assets.empL3 || 0);
+
+    const currentThisAssigned = currentAssignments[targetKey];
+    const newThisAssigned = Math.max(0, Math.min(totalThisLevel, currentThisAssigned + delta));
+
+    // Check desk capacity if seating more
+    const otherAssigned = (deskInfo.totalAssigned - currentThisAssigned);
+    if (delta > 0 && (otherAssigned + newThisAssigned) > totalDesks) {
+      alert(`Cannot seat more staff than available desks (${totalDesks} Desks).`);
+      return;
+    }
+
+    const updatedAssets = {
+      ...assets,
+      assignedEmpL1: level === 1 ? newThisAssigned : deskInfo.assignedL1,
+      assignedEmpL2: level === 2 ? newThisAssigned : deskInfo.assignedL2,
+      assignedEmpL3: level === 3 ? newThisAssigned : deskInfo.assignedL3
+    };
+
+    try {
+      await updateTeam(team.id, { assets: updatedAssets });
+      await logActivity(`"${team.name}" updated desk assignments for Level ${level} staff.`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to assign desk: " + err.message);
+    }
+  };
+
+  // Reset desk assignments to automatic optimal seating
+  const handleResetToAutoDesks = async () => {
+    const updatedAssets = { ...assets };
+    delete updatedAssets.assignedEmpL1;
+    delete updatedAssets.assignedEmpL2;
+    delete updatedAssets.assignedEmpL3;
+
+    try {
+      await updateTeam(team.id, { assets: updatedAssets });
+      await logActivity(`"${team.name}" reset desk assignments to optimal automatic seating.`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to reset desk assignments: " + err.message);
+    }
+  };
+
+  // AUTOMATIC CASE SOLVER & PROFIT HARVESTER
+  const handleAutoSolveCases = async () => {
+    if (optimalSolve.totalCases === 0) {
+      alert("No cases can be solved. Check employee desk assignments, cert limit, and consumable charges (TV, Couch, Comp).");
+      return;
+    }
+
+    setIsSaving(true);
+    setAutoSolveSuccess(false);
+
+    try {
+      const addedRevenue = optimalSolve.totalProfit;
+      const newProfit = profit + addedRevenue;
+
+      // Deduct consumable charges used
+      const updatedAssets = {
+        ...assets,
+        tvCharges: Math.max(0, (assets.tvCharges || 0) - optimalSolve.type1),
+        couchCharges: Math.max(0, (assets.couchCharges || 0) - optimalSolve.type2),
+        computerCharges: Math.max(0, (assets.computerCharges || 0) - optimalSolve.type3)
+      };
+
+      // Reset cases logged since they are solved and collected immediately
+      const historyRecord = {
+        timestamp: Date.now(),
+        type: "auto_solved",
+        casesSolved: {
+          type1: optimalSolve.type1,
+          type2: optimalSolve.type2,
+          type3: optimalSolve.type3
+        },
+        profitAdded: addedRevenue,
+        newProfit
+      };
+
+      const updatedHistory = [...(team.history || []), historyRecord];
+
+      await updateTeam(team.id, {
+        profit: newProfit,
+        cash: newProfit,
+        assets: updatedAssets,
+        casesLogged: { type1: 0, type2: 0, type3: 0 },
+        history: updatedHistory
+      });
+
+      setLocalCases({ type1: 0, type2: 0, type3: 0 });
+
+      await logActivity(
+        `⚡ Auto-solved ${optimalSolve.totalCases} cases for "${team.name}" (${optimalSolve.type3}x T3, ${optimalSolve.type2}x T2, ${optimalSolve.type1}x T1) -> +$${addedRevenue.toLocaleString()} profit added!`
+      );
+
+      setAutoSolveSuccess(true);
+      setTimeout(() => setAutoSolveSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to auto-solve cases: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Auto-fill cases input fields for preview
+  const handleAutoFillInputs = () => {
+    setLocalCases({
+      type1: optimalSolve.type1,
+      type2: optimalSolve.type2,
+      type3: optimalSolve.type3
+    });
   };
 
   const handleCasesChange = (type, value) => {
@@ -110,7 +306,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
       await updateTeam(team.id, {
         casesLogged: localCases
       });
-      await logActivity(`Saved team data and logged cases for "${team.name}".`);
+      await logActivity(`Saved cases for "${team.name}".`);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
@@ -121,13 +317,15 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
     }
   };
 
-  // Pre-calculate upgrade cost for Certificate
-  const nextCertLevel = (assets.certLevel || 0) + 1;
-  const certUpgradeCost = nextCertLevel <= 5 ? currentPrices[`cert${nextCertLevel}`] : null;
-
-  // Limits checks for styling/disabling
+  // Limits checks
   const isAtEmployeeLimit = totalEmployees >= maxEmployees;
-  const isAtDeskLimit = totalEmployees >= (assets.desks || 0);
+  const unassignedStaffCount = totalEmployees - deskInfo.totalAssigned;
+
+  // Round Potential Revenue from manually logged cases
+  const potentialProfit =
+    (localCases.type1 || 0) * (caseRevenues.type1 || 7500) +
+    (localCases.type2 || 0) * (caseRevenues.type2 || 10000) +
+    (localCases.type3 || 0) * (caseRevenues.type3 || 15000);
 
   // Color Theme definitions
   const theme = COLOR_THEMES[team.color] || {
@@ -142,7 +340,7 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
       
       {/* Top Banner & Title */}
       <div>
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div className="truncate pr-2">
             <h3 className={`text-lg font-extrabold tracking-wide transition-colors truncate ${theme.text}`}>
               {team.name}
@@ -165,79 +363,289 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
           </button>
         </div>
 
-        {/* Financial Stat */}
-        <div className="mb-4 rounded-xl bg-slate-950/40 border border-slate-850 p-3 flex justify-between items-center">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Available Capital</span>
-          <span className="text-xl font-black text-emerald-400 font-mono">
-            ${cash.toLocaleString()}
-          </span>
+        {/* Total Profit Display Banner */}
+        <div className="mb-4 rounded-xl bg-slate-950/70 border border-slate-800 p-3">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
+              Total Profit
+            </span>
+            <span className={`text-2xl font-black font-mono tracking-tight ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              {profit >= 0 ? `$${profit.toLocaleString()}` : `-$${Math.abs(profit).toLocaleString()}`}
+            </span>
+          </div>
+
+          {/* Quick Profit Add/Subtract Controls */}
+          <div className="pt-2 border-t border-slate-850/80 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1">
+                <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-slate-500 text-xs font-mono">$</span>
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  value={customProfitInput}
+                  onChange={(e) => setCustomProfitInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && customProfitInput) {
+                      handleAdjustProfit(customProfitInput);
+                    }
+                  }}
+                  className="w-full pl-6 pr-2 py-1 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none font-mono"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => handleAdjustProfit(customProfitInput || 1000)}
+                disabled={isAdjustingProfit}
+                className="flex items-center gap-1 bg-emerald-600/90 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 shadow-sm shadow-emerald-900/30 disabled:opacity-50"
+                title="Add to Profit"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => handleAdjustProfit(-(Number(customProfitInput) || 1000))}
+                disabled={isAdjustingProfit}
+                className="flex items-center gap-1 bg-rose-600/90 hover:bg-rose-500 text-white px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 shadow-sm shadow-rose-900/30 disabled:opacity-50"
+                title="Subtract from Profit"
+              >
+                <Minus className="h-3.5 w-3.5" />
+                Sub
+              </button>
+            </div>
+
+            {/* Fast Quick Buttons */}
+            <div className="flex items-center justify-between gap-1 text-[10px] font-mono">
+              <span className="text-slate-500 font-sans font-semibold">Quick:</span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => handleAdjustProfit(1000)}
+                  className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded transition active:scale-90"
+                >
+                  +1k
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustProfit(5000)}
+                  className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded transition active:scale-90"
+                >
+                  +5k
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustProfit(-1000)}
+                  className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded transition active:scale-90"
+                >
+                  -1k
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAdjustProfit(-5000)}
+                  className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded transition active:scale-90"
+                >
+                  -5k
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Asset Dashboard Grid */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          <div className="rounded-lg bg-slate-950/20 p-2.5 border border-slate-850">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <Users className="h-3.5 w-3.5 text-indigo-400" />
-              Staff
-            </span>
+        {/* Operational Overview Grid */}
+        <div className="grid grid-cols-2 gap-2.5 mb-3">
+          {/* Staff Counter */}
+          <div className="rounded-lg bg-slate-950/30 p-2.5 border border-slate-850">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Users className="h-3.5 w-3.5 text-indigo-400" />
+                Staff Total
+              </span>
+              {isAtEmployeeLimit && (
+                <span className="text-[9px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.2 rounded font-bold uppercase">
+                  Max
+                </span>
+              )}
+            </div>
             <div className="flex justify-between items-end mt-1">
               <span className="text-base font-extrabold text-white font-mono">
                 {totalEmployees} <span className="text-xs text-slate-500 font-normal">/ {maxEmployees}</span>
               </span>
-              {isAtEmployeeLimit && (
-                <span className="text-[9px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                  Full
-                </span>
-              )}
+              <span className="text-[10px] font-medium text-slate-400">
+                {deskInfo.totalAssigned} seated
+              </span>
             </div>
           </div>
 
-          <div className="rounded-lg bg-slate-950/20 p-2.5 border border-slate-850">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-              <Layout className="h-3.5 w-3.5 text-indigo-400" />
-              Desks
-            </span>
+          {/* Desks Counter & Desk Assignment Toggle */}
+          <div className="rounded-lg bg-slate-950/30 p-2.5 border border-slate-850 flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Layout className="h-3.5 w-3.5 text-indigo-400" />
+                Desks
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowDeskManager(!showDeskManager)}
+                className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border transition ${
+                  showDeskManager
+                    ? "bg-indigo-600 text-white border-indigo-500"
+                    : "bg-slate-800 hover:bg-slate-700 text-indigo-300 border-slate-700"
+                }`}
+                title="Manage Employee Desk Assignments"
+              >
+                {showDeskManager ? "Close" : "Assign Desks"}
+              </button>
+            </div>
             <div className="flex justify-between items-end mt-1">
               <span className="text-base font-extrabold text-white font-mono">
                 {assets.desks || 0}
               </span>
-              {isAtDeskLimit && totalEmployees > 0 && (
-                <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                  Cap
-                </span>
-              )}
+              <span className="text-[10px] text-slate-400">
+                {Math.max(0, (assets.desks || 0) - deskInfo.totalAssigned)} free
+              </span>
             </div>
           </div>
 
-          <div className="rounded-lg bg-slate-950/20 p-2.5 border border-slate-850">
+          {/* Certificate */}
+          <div className="rounded-lg bg-slate-950/30 p-2.5 border border-slate-850">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
               <Award className="h-3.5 w-3.5 text-indigo-400" />
               Certificate
             </span>
-            <div className="mt-1">
+            <div className="mt-1 flex justify-between items-end">
               <span className="text-base font-extrabold text-white font-mono">
                 Lvl {assets.certLevel || 0}
               </span>
-              <span className="block text-[9px] text-slate-500">
-                Max {certLimits[assets.certLevel || 0]} cases
+              <span className="text-[10px] text-slate-500">
+                Max {certLimits[assets.certLevel || 0] || 0} cases
               </span>
             </div>
           </div>
 
-          <div className="rounded-lg bg-slate-950/20 p-2.5 border border-slate-850 flex flex-col justify-between">
+          {/* Working Capacity */}
+          <div className="rounded-lg bg-slate-950/30 p-2.5 border border-slate-850 flex flex-col justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               Working Capacity
             </span>
-            <div className="mt-1">
+            <div className="mt-1 flex justify-between items-end">
               <span className="text-sm font-bold text-indigo-400 font-mono">
-                {workingCapacity} <span className="text-[10px] text-slate-500 font-normal">cases/mkt</span>
+                {workingCapacity} <span className="text-[10px] text-slate-500 font-normal">cases</span>
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Ceiling: {solvableCeiling}
               </span>
             </div>
           </div>
         </div>
 
+        {/* Desk Assignment Drawer (Interactive Desk Allocation) */}
+        {showDeskManager && (
+          <div className="mb-4 rounded-xl border border-indigo-500/30 bg-indigo-950/20 p-3 space-y-2.5 animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-indigo-500/20 pb-1.5">
+              <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+                <Armchair className="h-3.5 w-3.5 text-indigo-400" />
+                Desk Seating Allocation ({deskInfo.totalAssigned} / {assets.desks || 0} Desks Occupied)
+              </span>
+              <button
+                type="button"
+                onClick={handleResetToAutoDesks}
+                className="text-[9px] text-indigo-400 hover:text-indigo-200 underline font-medium"
+              >
+                Auto-Optimize
+              </button>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              {/* L3 Employees */}
+              <div className="flex items-center justify-between bg-slate-950/50 p-1.5 rounded-lg border border-slate-800">
+                <span className="font-medium text-slate-200 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-cyan-400" />
+                  Emp L3 (3 cases): {deskInfo.assignedL3} / {assets.empL3 || 0} at desk
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAssignDesk(3, -1)}
+                    disabled={deskInfo.assignedL3 <= 0}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30"
+                    title="Unseat Emp L3"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAssignDesk(3, 1)}
+                    disabled={deskInfo.assignedL3 >= (assets.empL3 || 0) || deskInfo.totalAssigned >= (assets.desks || 0)}
+                    className="p-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30"
+                    title="Seat Emp L3 at Desk"
+                  >
+                    <Plus className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* L2 Employees */}
+              <div className="flex items-center justify-between bg-slate-950/50 p-1.5 rounded-lg border border-slate-800">
+                <span className="font-medium text-slate-200 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-pink-400" />
+                  Emp L2 (2 cases): {deskInfo.assignedL2} / {assets.empL2 || 0} at desk
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAssignDesk(2, -1)}
+                    disabled={deskInfo.assignedL2 <= 0}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30"
+                    title="Unseat Emp L2"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAssignDesk(2, 1)}
+                    disabled={deskInfo.assignedL2 >= (assets.empL2 || 0) || deskInfo.totalAssigned >= (assets.desks || 0)}
+                    className="p-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30"
+                    title="Seat Emp L2 at Desk"
+                  >
+                    <Plus className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* L1 Employees */}
+              <div className="flex items-center justify-between bg-slate-950/50 p-1.5 rounded-lg border border-slate-800">
+                <span className="font-medium text-slate-200 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                  Emp L1 (1 case): {deskInfo.assignedL1} / {assets.empL1 || 0} at desk
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAssignDesk(1, -1)}
+                    disabled={deskInfo.assignedL1 <= 0}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30"
+                    title="Unseat Emp L1"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAssignDesk(1, 1)}
+                    disabled={deskInfo.assignedL1 >= (assets.empL1 || 0) || deskInfo.totalAssigned >= (assets.desks || 0)}
+                    className="p-1 rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-30"
+                    title="Seat Emp L1 at Desk"
+                  >
+                    <Plus className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Consumables Inventory Panel */}
-        <div className="mb-5 rounded-xl border border-slate-800/80 bg-slate-950/20 p-3 space-y-2">
+        <div className="mb-3 rounded-xl border border-slate-800/80 bg-slate-950/20 p-2.5 space-y-2">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block border-b border-slate-800/50 pb-1">
             Consumable Case Capacity (Charges)
           </span>
@@ -263,147 +671,218 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
           </div>
         </div>
 
-        {/* Purchase Items Panel */}
-        <div className="mb-5 border-t border-slate-850 pt-4">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-            Market Store (Market {currentMarket})
+        {/* Resource Acquisition (Can buy employee freely without desk) */}
+        <div className="mb-3 border-t border-slate-850 pt-2.5">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+            Hire Staff & Add Resources (Free)
           </span>
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid grid-cols-2 gap-1.5 text-xs">
             
             {/* L1 Employee */}
-            <button
-              onClick={() => handlePurchase("empL1", currentPrices.empL1, "Employee Level 1")}
-              disabled={cash < currentPrices.empL1 || isAtEmployeeLimit || isAtDeskLimit}
-              className={`flex items-center justify-between p-2 rounded-lg border text-left active:scale-95 transition ${
-                isAtEmployeeLimit || isAtDeskLimit
-                  ? "bg-slate-850 border-slate-800 text-slate-600 cursor-not-allowed"
-                  : "bg-slate-950/40 border-slate-800 hover:border-indigo-500 text-white"
-              }`}
-            >
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
-                <span className="block font-bold">Emp L1</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.empL1.toLocaleString()}</span>
+                <span className="block font-bold text-[11px]">Emp L1</span>
+                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.empL1 || 0}</span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.empL1 || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("empL1", -1, "Employee L1")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove Emp L1"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("empL1", 1, "Employee L1")}
+                  disabled={isAtEmployeeLimit}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="Hire Emp L1 (Can buy without desk)"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
             {/* L2 Employee */}
-            <button
-              onClick={() => handlePurchase("empL2", currentPrices.empL2, "Employee Level 2")}
-              disabled={cash < currentPrices.empL2 || isAtEmployeeLimit || isAtDeskLimit}
-              className={`flex items-center justify-between p-2 rounded-lg border text-left active:scale-95 transition ${
-                isAtEmployeeLimit || isAtDeskLimit
-                  ? "bg-slate-850 border-slate-800 text-slate-600 cursor-not-allowed"
-                  : "bg-slate-950/40 border-slate-800 hover:border-indigo-500 text-white"
-              }`}
-            >
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
-                <span className="block font-bold">Emp L2</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.empL2.toLocaleString()}</span>
+                <span className="block font-bold text-[11px]">Emp L2</span>
+                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.empL2 || 0}</span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.empL2 || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("empL2", -1, "Employee L2")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove Emp L2"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("empL2", 1, "Employee L2")}
+                  disabled={isAtEmployeeLimit}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="Hire Emp L2 (Can buy without desk)"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
             {/* L3 Employee */}
-            <button
-              onClick={() => handlePurchase("empL3", currentPrices.empL3, "Employee Level 3")}
-              disabled={cash < currentPrices.empL3 || isAtEmployeeLimit || isAtDeskLimit}
-              className={`flex items-center justify-between p-2 rounded-lg border text-left active:scale-95 transition ${
-                isAtEmployeeLimit || isAtDeskLimit
-                  ? "bg-slate-850 border-slate-800 text-slate-600 cursor-not-allowed"
-                  : "bg-slate-950/40 border-slate-800 hover:border-indigo-500 text-white"
-              }`}
-            >
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
-                <span className="block font-bold">Emp L3</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.empL3.toLocaleString()}</span>
+                <span className="block font-bold text-[11px]">Emp L3</span>
+                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.empL3 || 0}</span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.empL3 || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("empL3", -1, "Employee L3")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove Emp L3"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("empL3", 1, "Employee L3")}
+                  disabled={isAtEmployeeLimit}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="Hire Emp L3 (Can buy without desk)"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
             {/* Desk */}
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
+              <div>
+                <span className="block font-bold text-[11px]">Desk</span>
+                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.desks || 0}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {(assets.desks || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("desk", -1, "Desk")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove Desk"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("desk", 1, "Desk")}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Add Desk"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* TV (+3) */}
             <button
-              onClick={() => handlePurchase("desk", currentPrices.desk, "Desk")}
-              disabled={cash < currentPrices.desk}
-              className="flex items-center justify-between p-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition disabled:opacity-40 text-left"
+              type="button"
+              onClick={() => handleModifyAsset("tv", 1, "TV (3 Charges)")}
+              className="flex items-center justify-between p-1.5 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition text-left"
             >
               <div>
-                <span className="block font-bold">Desk</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.desk.toLocaleString()}</span>
+                <span className="block font-bold text-[11px]">TV (T1)</span>
+                <span className="text-[9px] text-slate-500 font-mono">+3 Charges</span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
+              <Plus className="h-3 w-3 text-indigo-400" />
             </button>
 
-            {/* TV */}
+            {/* Couch (+3) */}
             <button
-              onClick={() => handlePurchase("tv", currentPrices.tv, "TV (Support T1)")}
-              disabled={cash < currentPrices.tv}
-              className="flex items-center justify-between p-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition disabled:opacity-40 text-left"
+              type="button"
+              onClick={() => handleModifyAsset("couch", 1, "Couch (3 Charges)")}
+              className="flex items-center justify-between p-1.5 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition text-left"
             >
               <div>
-                <span className="block font-bold">TV (T1)</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.tv.toLocaleString()}</span>
+                <span className="block font-bold text-[11px]">Couch (T2)</span>
+                <span className="text-[9px] text-slate-500 font-mono">+3 Charges</span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
+              <Plus className="h-3 w-3 text-indigo-400" />
             </button>
 
-            {/* Couch */}
+            {/* Computer (+3) */}
             <button
-              onClick={() => handlePurchase("couch", currentPrices.couch, "Couch (Support T2)")}
-              disabled={cash < currentPrices.couch}
-              className="flex items-center justify-between p-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition disabled:opacity-40 text-left"
+              type="button"
+              onClick={() => handleModifyAsset("computer", 1, "Computer (3 Charges)")}
+              className="flex items-center justify-between p-1.5 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition text-left"
             >
               <div>
-                <span className="block font-bold">Couch (T2)</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.couch.toLocaleString()}</span>
+                <span className="block font-bold text-[11px]">Comp (T3)</span>
+                <span className="text-[9px] text-slate-500 font-mono">+3 Charges</span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
-            </button>
-
-            {/* Computer */}
-            <button
-              onClick={() => handlePurchase("computer", currentPrices.computer, "Computer (Support T3)")}
-              disabled={cash < currentPrices.computer}
-              className="flex items-center justify-between p-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition disabled:opacity-40 text-left"
-            >
-              <div>
-                <span className="block font-bold">Comp (T3)</span>
-                <span className="text-[10px] text-slate-500 font-mono">${currentPrices.computer.toLocaleString()}</span>
-              </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
+              <Plus className="h-3 w-3 text-indigo-400" />
             </button>
 
             {/* Certificate */}
-            <button
-              onClick={() => handlePurchase("cert", certUpgradeCost, `Certificate Lvl ${nextCertLevel}`)}
-              disabled={assets.certLevel >= 5 || !certUpgradeCost || cash < certUpgradeCost}
-              className="flex items-center justify-between p-2 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition disabled:opacity-40 text-left"
-            >
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
-                <span className="block font-bold">
-                  {assets.certLevel >= 5 ? "Cert Max" : `Cert Lvl ${nextCertLevel}`}
-                </span>
-                <span className="text-[10px] text-slate-500 font-mono">
-                  {assets.certLevel >= 5 ? "-" : `$${certUpgradeCost?.toLocaleString()}`}
+                <span className="block font-bold text-[11px]">Certificate</span>
+                <span className="text-[9px] text-slate-500 font-mono">
+                  {assets.certLevel >= 5 ? "Max Lvl 5" : `Lvl ${assets.certLevel || 0}/5`}
                 </span>
               </div>
-              <Plus className="h-3.5 w-3.5 text-slate-500" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.certLevel || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("cert", -1, "Certificate Level")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Downgrade Certificate"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("cert", 1, "Certificate Level")}
+                  disabled={assets.certLevel >= 5}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
+                  title="Upgrade Certificate"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
           </div>
           
-          {/* Employee Limitations Warnings */}
-          <div className="mt-2 space-y-1">
-            {isAtEmployeeLimit && (
-              <p className="text-[10px] text-rose-400 flex items-center gap-1 font-medium bg-rose-500/5 px-2 py-1 rounded border border-rose-500/10">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Hired maximum employees allowed ({maxEmployees}).
+          {/* Informative Status Notes */}
+          <div className="mt-1.5 space-y-1">
+            {unassignedStaffCount > 0 && (
+              <p className="text-[10px] text-amber-400 flex items-center justify-between font-medium bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/10">
+                <span>{unassignedStaffCount} unseated staff member(s). Add desk or assign them to activate.</span>
+                <button
+                  type="button"
+                  onClick={() => setShowDeskManager(true)}
+                  className="underline text-[9px] font-bold"
+                >
+                  Assign
+                </button>
               </p>
             )}
-            {isAtDeskLimit && !isAtEmployeeLimit && (
-              <p className="text-[10px] text-amber-400 flex items-center gap-1 font-medium bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 animate-pulse">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Un-desked Employee warning: Purchase Desk to hire more staff.
+            {isAtEmployeeLimit && (
+              <p className="text-[10px] text-slate-400 flex items-center gap-1 font-medium bg-slate-800/40 px-2 py-0.5 rounded border border-slate-700">
+                <AlertCircle className="h-3 w-3 shrink-0 text-slate-400" />
+                Reached max firm employee limit ({maxEmployees}).
               </p>
             )}
           </div>
@@ -411,109 +890,161 @@ export default function TeamCard({ team, config, currentMarket, onOverride }) {
 
       </div>
 
-      {/* Case Logging Panel */}
-      <div className="border-t border-slate-850 pt-4 mt-auto">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Resolve Cases (Solvable Ceiling: {solvableCeiling})
-          </span>
-          <span className="text-[10px] text-slate-500 font-bold">
-            Revenue Potential
-          </span>
-        </div>
+      {/* Case Management & Auto-Solving Panel */}
+      <div className="border-t border-slate-850 pt-2.5 mt-auto space-y-2.5">
         
-        <div className="space-y-2.5">
-          <div className="flex items-center gap-3">
-            <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Tv className="h-3.5 w-3.5 text-indigo-400" /> T1</span>
-            <input
-              type="number"
-              value={localCases.type1 || ""}
-              onChange={(e) => handleCasesChange("type1", e.target.value)}
-              className="w-16 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
-              min="0"
-            />
-            <span className="text-slate-600 text-xs">x</span>
-            <span className="text-xs text-slate-400 font-mono">${caseRevenues.type1.toLocaleString()}</span>
-            <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-              +${((localCases.type1 || 0) * caseRevenues.type1).toLocaleString()}
+        {/* AUTOMATIC SOLVER ACTION BAR */}
+        <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/40 to-slate-900 p-2.5">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+              <Zap className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+              Auto-Assign Cases to Employees
+            </span>
+            <span className="text-[10px] font-bold font-mono text-emerald-300">
+              +{optimalSolve.totalCases} cases (${optimalSolve.totalProfit.toLocaleString()})
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Sofa className="h-3.5 w-3.5 text-pink-400" /> T2</span>
-            <input
-              type="number"
-              value={localCases.type2 || ""}
-              onChange={(e) => handleCasesChange("type2", e.target.value)}
-              className="w-16 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
-              min="0"
-            />
-            <span className="text-slate-600 text-xs">x</span>
-            <span className="text-xs text-slate-400 font-mono">${caseRevenues.type2.toLocaleString()}</span>
-            <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-              +${((localCases.type2 || 0) * caseRevenues.type2).toLocaleString()}
-            </span>
-          </div>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={handleAutoSolveCases}
+              disabled={isSaving || optimalSolve.totalCases === 0}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black transition duration-200 active:scale-95 shadow-md ${
+                autoSolveSuccess
+                  ? "bg-emerald-500 text-slate-950"
+                  : "bg-emerald-600 hover:bg-emerald-500 text-white"
+              } disabled:opacity-40 disabled:hover:bg-emerald-600`}
+              title="Automatically assign employees to optimal cases, mark as solved, and add profit directly"
+            >
+              {autoSolveSuccess ? (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Solved & Profit Added!
+                </>
+              ) : (
+                <>
+                  <Zap className="h-3.5 w-3.5 fill-white" />
+                  Auto-Solve & Add Profit (+${optimalSolve.totalProfit.toLocaleString()})
+                </>
+              )}
+            </button>
 
-          <div className="flex items-center gap-3">
-            <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Monitor className="h-3.5 w-3.5 text-cyan-400" /> T3</span>
-            <input
-              type="number"
-              value={localCases.type3 || ""}
-              onChange={(e) => handleCasesChange("type3", e.target.value)}
-              className="w-16 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
-              min="0"
-            />
-            <span className="text-slate-600 text-xs">x</span>
-            <span className="text-xs text-slate-400 font-mono">${caseRevenues.type3.toLocaleString()}</span>
-            <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-              +${((localCases.type3 || 0) * caseRevenues.type3).toLocaleString()}
-            </span>
+            <button
+              type="button"
+              onClick={handleAutoFillInputs}
+              disabled={optimalSolve.totalCases === 0}
+              className="px-2 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-bold text-slate-300 transition active:scale-95 disabled:opacity-40"
+              title="Auto-fill numbers into input boxes for review"
+            >
+              Fill Inputs
+            </button>
           </div>
         </div>
 
-        {/* Dynamic Capacity / Validation Alerts */}
-        {!validation.isValid && (
-          <div className="mt-3 p-2 rounded bg-rose-500/10 border border-rose-500/25 text-[10px] text-rose-400 font-medium space-y-1">
-            {Object.values(validation.errors).map((err, idx) => (
-              <p key={idx} className="flex items-start gap-1">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>{err}</span>
-              </p>
-            ))}
+        {/* Manual Cases Logging Section */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span>Manual Case Resolver</span>
+            <span className="text-slate-400 font-mono">
+              Potential: +${potentialProfit.toLocaleString()}
+            </span>
           </div>
-        )}
+          
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Tv className="h-3.5 w-3.5 text-indigo-400" /> T1</span>
+              <input
+                type="number"
+                value={localCases.type1 || ""}
+                onChange={(e) => handleCasesChange("type1", e.target.value)}
+                className="w-14 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none font-mono"
+                min="0"
+              />
+              <span className="text-slate-600 text-xs">x</span>
+              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type1 || 7500).toLocaleString()}</span>
+              <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
+                +${((localCases.type1 || 0) * (caseRevenues.type1 || 7500)).toLocaleString()}
+              </span>
+            </div>
 
-        {/* Save Team Button */}
-        <div className="mt-4 pt-3 border-t border-slate-800/60">
-          <button
-            type="button"
-            onClick={handleSaveTeam}
-            disabled={isSaving}
-            className={`w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4 text-xs font-bold transition duration-200 active:scale-95 shadow-md ${
-              saveSuccess
-                ? "bg-emerald-600 text-white border border-emerald-500"
-                : "bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500/30"
-            } disabled:opacity-50`}
-          >
-            {isSaving ? (
-              <>
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Saving to Database...
-              </>
-            ) : saveSuccess ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-white" />
-                Saved to Database!
-              </>
-            ) : (
-              <>
-                <Save className="h-3.5 w-3.5" />
-                Save {team.name} Data
-              </>
-            )}
-          </button>
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Sofa className="h-3.5 w-3.5 text-pink-400" /> T2</span>
+              <input
+                type="number"
+                value={localCases.type2 || ""}
+                onChange={(e) => handleCasesChange("type2", e.target.value)}
+                className="w-14 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none font-mono"
+                min="0"
+              />
+              <span className="text-slate-600 text-xs">x</span>
+              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type2 || 10000).toLocaleString()}</span>
+              <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
+                +${((localCases.type2 || 0) * (caseRevenues.type2 || 10000)).toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-12 text-xs font-semibold text-slate-400 flex items-center gap-1"><Monitor className="h-3.5 w-3.5 text-cyan-400" /> T3</span>
+              <input
+                type="number"
+                value={localCases.type3 || ""}
+                onChange={(e) => handleCasesChange("type3", e.target.value)}
+                className="w-14 text-center rounded border border-slate-800 bg-slate-950 p-1 text-xs text-white focus:border-indigo-500 focus:outline-none font-mono"
+                min="0"
+              />
+              <span className="text-slate-600 text-xs">x</span>
+              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type3 || 15000).toLocaleString()}</span>
+              <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
+                +${((localCases.type3 || 0) * (caseRevenues.type3 || 15000)).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Validation alerts */}
+          {!validation.isValid && (
+            <div className="p-1.5 rounded bg-rose-500/10 border border-rose-500/25 text-[10px] text-rose-400 font-medium space-y-0.5">
+              {Object.values(validation.errors).map((err, idx) => (
+                <p key={idx} className="flex items-start gap-1">
+                  <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+                  <span>{err}</span>
+                </p>
+              ))}
+            </div>
+          )}
+
+          {/* Save Button for manually edited cases */}
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleSaveTeam}
+              disabled={isSaving}
+              className={`w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 px-3 text-xs font-bold transition duration-200 active:scale-95 ${
+                saveSuccess
+                  ? "bg-indigo-500 text-white"
+                  : "bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+              } disabled:opacity-50`}
+            >
+              {isSaving ? (
+                <>
+                  <RefreshCw className="h-3 w-3 animate-spin" />
+                  Saving...
+                </>
+              ) : saveSuccess ? (
+                <>
+                  <Check className="h-3 w-3 text-white" />
+                  Saved!
+                </>
+              ) : (
+                <>
+                  <Save className="h-3 w-3" />
+                  Save Logged Cases
+                </>
+              )}
+            </button>
+          </div>
         </div>
+
       </div>
 
     </div>

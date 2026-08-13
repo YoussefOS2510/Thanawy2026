@@ -58,7 +58,13 @@ export function clearFirebaseConfig() {
 
 // Demo Mode Helpers
 export function isDemoMode() {
-  return localStorage.getItem(DEMO_MODE_KEY) === "true";
+  const explicit = localStorage.getItem(DEMO_MODE_KEY);
+  if (explicit === "true") return true;
+  if (explicit === "false") return false;
+  // If not explicitly configured, default to demo mode if no valid Firebase config exists
+  const cfg = getSavedFirebaseConfig();
+  const validConfig = cfg && cfg.apiKey && (cfg.projectId || cfg.databaseURL);
+  return !validConfig;
 }
 
 export function setDemoMode(active) {
@@ -123,7 +129,7 @@ if (hasConfig && !isDemo) {
 export { app, db, firestoreDb };
 
 export function isFirebaseConnected() {
-  return app !== null || firestoreDb !== null || db !== null || hasConfig || isDemo;
+  return true; // Always connected (either via Firebase or offline local demo mode)
 }
 
 // Local storage listeners list for Demo Mode

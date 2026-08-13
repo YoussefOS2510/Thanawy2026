@@ -1,6 +1,5 @@
-import React, { useState } from "react";
-import { calculateNetWorth } from "../utils/capacity";
-import { Award, DollarSign, Briefcase, TrendingUp } from "lucide-react";
+import React from "react";
+import { TrendingUp, Trophy } from "lucide-react";
 
 const COLOR_BADGES = {
   beige: "bg-amber-400/20 text-amber-200 border-amber-400/30",
@@ -13,18 +12,12 @@ const COLOR_BADGES = {
   blue: "bg-blue-500/20 text-blue-400 border-blue-500/30"
 };
 
-export default function Leaderboard({ teams, config }) {
-  const [rankBy, setRankBy] = useState("netWorth"); // "cash" or "netWorth"
-
-  // Sort teams based on criteria
+export default function Leaderboard({ teams }) {
+  // Sort teams based on profit
   const sortedTeams = [...teams].sort((a, b) => {
-    if (rankBy === "cash") {
-      return (b.cash || 0) - (a.cash || 0);
-    } else {
-      const nwB = calculateNetWorth(b, config);
-      const nwA = calculateNetWorth(a, config);
-      return nwB - nwA;
-    }
+    const profitB = b.profit !== undefined ? b.profit : (b.cash || 0);
+    const profitA = a.profit !== undefined ? a.profit : (a.cash || 0);
+    return profitB - profitA;
   });
 
   const getRankBadge = (index) => {
@@ -42,44 +35,21 @@ export default function Leaderboard({ teams, config }) {
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 shadow-lg backdrop-blur h-full flex flex-col">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 mb-4 gap-3">
+      <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
         <div className="flex items-center gap-2">
-          <Award className="h-5 w-5 text-indigo-400" />
-          <h2 className="text-base font-bold text-white uppercase tracking-wider">Live Firm Standings</h2>
+          <Trophy className="h-5 w-5 text-yellow-400" />
+          <h2 className="text-base font-bold text-white uppercase tracking-wider">Live Profit Standings</h2>
         </div>
-        
-        {/* Toggle Controls */}
-        <div className="flex bg-slate-950/60 rounded-lg p-1 border border-slate-850">
-          <button
-            onClick={() => setRankBy("netWorth")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-              rankBy === "netWorth"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <TrendingUp className="h-3 w-3" />
-            Net Worth
-          </button>
-          <button
-            onClick={() => setRankBy("cash")}
-            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-              rankBy === "cash"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            <DollarSign className="h-3 w-3" />
-            Liquid Cash
-          </button>
-        </div>
+        <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full flex items-center gap-1">
+          <TrendingUp className="h-3 w-3" />
+          Ranked by Profit
+        </span>
       </div>
 
       {/* Leaderboard Table List */}
       <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[350px] lg:max-h-none scrollbar-thin">
         {sortedTeams.map((team, index) => {
-          const cashVal = team.cash || 0;
-          const netWorthVal = calculateNetWorth(team, config);
+          const profitVal = team.profit !== undefined ? team.profit : (team.cash || 0);
           const isTop3 = index < 3;
 
           return (
@@ -93,7 +63,7 @@ export default function Leaderboard({ teams, config }) {
             >
               <div className="flex items-center gap-3 truncate pr-2">
                 {/* Rank number indicator */}
-                <div className={`h-6 w-6 rounded-md flex items-center justify-center text-xs ${getRankBadge(index)}`}>
+                <div className={`h-6 w-6 rounded-md flex items-center justify-center text-xs shrink-0 ${getRankBadge(index)}`}>
                   {index + 1}
                 </div>
                 
@@ -112,17 +82,19 @@ export default function Leaderboard({ teams, config }) {
                     <span>Lvl {team.assets?.certLevel || 0} Cert</span>
                     <span>•</span>
                     <span>{team.assets?.desks || 0} Desks</span>
+                    <span>•</span>
+                    <span>{(team.assets?.empL1 || 0) + (team.assets?.empL2 || 0) + (team.assets?.empL3 || 0)} Staff</span>
                   </span>
                 </div>
               </div>
 
-              {/* Financial metric display */}
+              {/* Profit display */}
               <div className="text-right shrink-0">
-                <span className="text-sm font-extrabold text-white font-mono block">
-                  ${(rankBy === "cash" ? cashVal : netWorthVal).toLocaleString()}
+                <span className={`text-sm font-extrabold font-mono block ${profitVal >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {profitVal >= 0 ? `$${profitVal.toLocaleString()}` : `-$${Math.abs(profitVal).toLocaleString()}`}
                 </span>
                 <span className="text-[9px] text-slate-500 font-mono">
-                  {rankBy === "cash" ? "cash reserve" : "net asset value"}
+                  total profit
                 </span>
               </div>
             </div>

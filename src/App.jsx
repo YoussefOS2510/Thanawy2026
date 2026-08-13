@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { listenToGameData, isFirebaseConnected, resetDatabaseToDefaults, isDemoMode, setDemoMode } from "./utils/db";
-import { validateCaseInputs } from "./utils/capacity";
+import { listenToGameData, isFirebaseConnected, resetDatabaseToDefaults, isDemoMode, updateTeam, logActivity } from "./utils/db";
+import { validateCaseInputs, calculateOptimalCases } from "./utils/capacity";
+import { DEFAULT_CONFIG, DEFAULT_TEAMS } from "./utils/defaults";
 
 // Components
 import TeamCard from "./components/TeamCard";
@@ -12,7 +13,7 @@ import TeamOverrideModal from "./components/TeamOverrideModal";
 import MarketTransitionModal from "./components/MarketTransitionModal";
 
 // Icons
-import { Database, Settings, ArrowRight, Trophy, Sparkles, RefreshCw, Activity, Layers, HelpCircle, ShieldAlert, CloudUpload } from "lucide-react";
+import { Database, Settings, ArrowRight, Trophy, RefreshCw, Layers, ShieldAlert, Zap } from "lucide-react";
 
 export default function App() {
   const [gameData, setGameData] = useState(null);
@@ -65,12 +66,14 @@ export default function App() {
     }
   };
 
+  const config = gameData?.config || DEFAULT_CONFIG;
+
   // Run validation on all teams to check for transition readiness
   const getValidationErrorsCount = () => {
     if (!gameData || !gameData.teams) return 0;
     let errorsCount = 0;
     Object.values(gameData.teams).forEach((team) => {
-      const validation = validateCaseInputs(team.assets, gameData.config.certLimits, team.casesLogged);
+      const validation = validateCaseInputs(team.assets, config.certLimits, team.casesLogged);
       if (!validation.isValid) errorsCount++;
     });
     return errorsCount;
@@ -88,12 +91,65 @@ export default function App() {
   // Convert teams object to sorted array by id for consistent display order
   const teamsList = gameData && gameData.teams
     ? Object.values(gameData.teams).sort((a, b) => a.id.localeCompare(b.id))
-    : [];
+    : DEFAULT_TEAMS;
 
   const currentMarket = gameData?.gameState?.currentMarket || 1;
   const isGameOver = gameData?.gameState?.isGameOver || false;
 
+  // Global Auto-Solve action for all teams
+  const handleAutoSolveAllTeams = async () => {
+    if (!window.confirm("Auto-assign staff to optimal cases, mark as solved, and add profit for all 8 firms?")) return;
 
+    try {
+      let totalSolvedAll = 0;
+      let totalProfitAll = 0;
+
+      for (const team of teamsList) {
+        const optimal = calculateOptimalCases(team.assets, config.certLimits, config.caseRevenues);
+        if (optimal.totalCases > 0) {
+          const currentProfit = team.profit !== undefined ? team.profit : (team.cash || 0);
+          const newProfit = currentProfit + optimal.totalProfit;
+          const updatedAssets = {
+            ...team.assets,
+            tvCharges: Math.max(0, (team.assets?.tvCharges || 0) - optimal.type1),
+            couchCharges: Math.max(0, (team.assets?.couchCharges || 0) - optimal.type2),
+            computerCharges: Math.max(0, (team.assets?.computerCharges || 0) - optimal.type3)
+          };
+
+          const historyRecord = {
+            timestamp: Date.now(),
+            type: "auto_solved",
+            casesSolved: {
+              type1: optimal.type1,
+              type2: optimal.type2,
+              type3: optimal.type3
+            },
+            profitAdded: optimal.totalProfit,
+            newProfit
+          };
+
+          const updatedHistory = [...(team.history || []), historyRecord];
+
+          await updateTeam(team.id, {
+            profit: newProfit,
+            cash: newProfit,
+            assets: updatedAssets,
+            casesLogged: { type1: 0, type2: 0, type3: 0 },
+            history: updatedHistory
+          });
+
+          totalSolvedAll += optimal.totalCases;
+          totalProfitAll += optimal.totalProfit;
+        }
+      }
+
+      await logActivity(`⚡ GM triggered Auto-Solve for ALL firms: ${totalSolvedAll} cases solved (+$${totalProfitAll.toLocaleString()} total profit distributed).`);
+      alert(`Auto-solve complete! Solved ${totalSolvedAll} cases across firms (+$${totalProfitAll.toLocaleString()} total profit added).`);
+    } catch (err) {
+      console.error(err);
+      alert("Auto-solve failed: " + err.message);
+    }
+  };
 
   // Loading spinner
   if (loading) {
@@ -147,9 +203,9 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-black text-white tracking-wide uppercase flex items-center gap-2">
-              Suits Scoring <span className="text-indigo-400 font-normal text-sm lowercase border border-indigo-500/25 px-2 py-0.5 rounded-full bg-indigo-500/5">score tracker</span>
+              Suits Scoring <span className="text-emerald-400 font-normal text-sm lowercase border border-emerald-500/25 px-2 py-0.5 rounded-full bg-emerald-500/5">profit calculator</span>
             </h1>
-            <p className="text-xs text-slate-400">Interactive Game Master Dashboard for 8 Legal Firms</p>
+            <p className="text-xs text-slate-400">Interactive Game Master Dashboard & Profit Tracker for 8 Legal Firms</p>
           </div>
         </div>
 
@@ -180,7 +236,7 @@ export default function App() {
           <button
             onClick={() => setIsAdminOpen(true)}
             className="flex items-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 px-3  py-1.5 text-xs font-semibold text-slate-350 hover:text-white transition active:scale-95"
-            title="Configure item prices"
+            title="Configure game rules and case revenues"
           >
             <Settings className="h-4 w-4" />
             Game settings
@@ -212,7 +268,7 @@ export default function App() {
         {/* Teams Dashboard View (Columns 1-3) */}
         <div className="lg:col-span-3 space-y-6 flex flex-col">
           {/* Active Market Info Header */}
-          <div className="flex items-center justify-between bg-slate-900/25 border border-slate-850 p-4 rounded-2xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-900/25 border border-slate-850 p-4 rounded-2xl gap-3">
             <div className="flex items-center gap-3">
               <div className="bg-indigo-500/10 p-2 rounded-lg text-indigo-400">
                 <Layers className="h-5 w-5" />
@@ -225,16 +281,26 @@ export default function App() {
               </div>
             </div>
             
-            {/* Status alerts */}
+            {/* Global Auto-solve button & Status alerts */}
             {!isGameOver && (
-              <div className="text-right">
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleAutoSolveAllTeams}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 px-3.5 py-1.5 text-xs font-black text-white shadow-lg shadow-emerald-900/30 active:scale-95 transition"
+                  title="Auto-solve cases and add profits for all 8 firms simultaneously"
+                >
+                  <Zap className="h-3.5 w-3.5 fill-white" />
+                  Auto-Solve All Firms
+                </button>
+
                 {getValidationErrorsCount() > 0 ? (
                   <span className="text-xs font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-1.5 rounded-lg text-rose-400">
-                    {getValidationErrorsCount()} Teams have capacity warnings
+                    {getValidationErrorsCount()} Teams have warnings
                   </span>
                 ) : (
                   <span className="text-xs font-semibold bg-slate-850 px-3 py-1.5 rounded-lg text-slate-450">
-                    Ready to advance round
+                    Round in progress
                   </span>
                 )}
               </div>
@@ -247,8 +313,7 @@ export default function App() {
               <TeamCard
                 key={team.id}
                 team={team}
-                config={gameData.config}
-                currentMarket={currentMarket}
+                config={config}
                 onOverride={setActiveOverrideTeam}
               />
             ))}
@@ -260,12 +325,12 @@ export default function App() {
           <div className="flex-1 flex flex-col justify-between gap-6">
             {/* Leaderboard Panel */}
             <div className="flex-1">
-              <Leaderboard teams={teamsList} config={gameData.config} />
+              <Leaderboard teams={teamsList} />
             </div>
             
             {/* Activity Logs Terminal */}
             <div className="h-[280px]">
-              <LogPanel logs={gameData.logs} />
+              <LogPanel logs={gameData?.logs} />
             </div>
           </div>
         </div>
@@ -274,7 +339,7 @@ export default function App() {
 
       {/* Footer copyright */}
       <footer className="relative z-10 border-t border-slate-900/60 bg-slate-950/80 px-6 py-3 text-center text-[10px] font-mono text-slate-500">
-        Suits Score Calculator v1.2.0 • Firebase Realtime DB Engine • Antigravity AI
+        Suits Profit & Score Calculator • Firebase Realtime DB Engine • Antigravity AI
       </footer>
 
       {/* Modals Container */}
@@ -285,7 +350,7 @@ export default function App() {
       <AdminConfigModal
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
-        gameConfig={gameData?.config}
+        gameConfig={config}
       />
       <TeamOverrideModal
         isOpen={activeOverrideTeam !== null}
@@ -296,7 +361,7 @@ export default function App() {
         isOpen={isTransitionOpen}
         onClose={() => setIsTransitionOpen(false)}
         teams={teamsList}
-        config={gameData?.config}
+        config={config}
         currentMarket={currentMarket}
       />
     </div>

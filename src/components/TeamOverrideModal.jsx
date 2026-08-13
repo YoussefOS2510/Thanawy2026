@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { updateTeam, logActivity } from "../utils/db";
-import { X, Award, DollarSign, Users, Sparkles, ShoppingCart } from "lucide-react";
+import { X, Award, Users, Sparkles, ShoppingCart, TrendingUp } from "lucide-react";
 
 export default function TeamOverrideModal({ isOpen, onClose, team }) {
-  const [cash, setCash] = useState(0);
+  const [profit, setProfit] = useState(0);
   const [empL1, setEmpL1] = useState(0);
   const [empL2, setEmpL2] = useState(0);
   const [empL3, setEmpL3] = useState(0);
@@ -16,7 +16,7 @@ export default function TeamOverrideModal({ isOpen, onClose, team }) {
 
   useEffect(() => {
     if (team) {
-      setCash(team.cash || 0);
+      setProfit(team.profit !== undefined ? team.profit : (team.cash || 0));
       setEmpL1(team.assets?.empL1 || 0);
       setEmpL2(team.assets?.empL2 || 0);
       setEmpL3(team.assets?.empL3 || 0);
@@ -35,7 +35,8 @@ export default function TeamOverrideModal({ isOpen, onClose, team }) {
     setIsSaving(true);
     try {
       const updates = {
-        cash: Number(cash),
+        profit: Number(profit),
+        cash: Number(profit), // sync fallback
         assets: {
           empL1: Number(empL1),
           empL2: Number(empL2),
@@ -49,7 +50,7 @@ export default function TeamOverrideModal({ isOpen, onClose, team }) {
       };
 
       await updateTeam(team.id, updates);
-      await logActivity(`GM overrode assets and cash for team "${team.name}".`);
+      await logActivity(`GM manually overrode profit ($${Number(profit).toLocaleString()}) and assets for team "${team.name}".`);
       onClose();
     } catch (err) {
       console.error(err);
@@ -71,7 +72,7 @@ export default function TeamOverrideModal({ isOpen, onClose, team }) {
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Manual Override: {team.name}</h2>
-              <p className="text-sm text-slate-400">Directly modify firm funds and asset balances. Use with caution.</p>
+              <p className="text-sm text-slate-400">Directly modify firm profit and asset quantities.</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
@@ -83,19 +84,19 @@ export default function TeamOverrideModal({ isOpen, onClose, team }) {
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             
-            {/* Cash Override */}
+            {/* Profit Override */}
             <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/20 p-4 space-y-3">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4 text-emerald-400" />
-                Capital Reserves
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                Firm Profit Balance
               </h3>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Available Cash ($)</label>
+                <label className="block text-xs text-slate-400 mb-1">Total Profit ($)</label>
                 <input
                   type="number"
-                  value={cash}
-                  onChange={(e) => setCash(e.target.value)}
-                  className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-sm text-white focus:border-amber-500 focus:outline-none"
+                  value={profit}
+                  onChange={(e) => setProfit(e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-sm text-white focus:border-amber-500 focus:outline-none font-mono"
                   required
                 />
               </div>
@@ -176,7 +177,7 @@ export default function TeamOverrideModal({ isOpen, onClose, team }) {
             <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/20 p-4 space-y-3">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                 <ShoppingCart className="h-4 w-4 text-indigo-400" />
-                Consumable Capacity (Charges Left: 1 item = 3 charges)
+                Consumable Capacity (Charges Left)
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 <div>

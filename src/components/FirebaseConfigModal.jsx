@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { getSavedFirebaseConfig, saveFirebaseConfig, clearFirebaseConfig, isFirebaseConnected, resetDatabaseToDefaults } from "../utils/db";
-import { Database, Save, Trash2, X, RefreshCw, Send } from "lucide-react";
+import { Database, Save, Trash2, X, Send } from "lucide-react";
 
 export default function FirebaseConfigModal({ isOpen, onClose }) {
   const [config, setConfig] = useState(getSavedFirebaseConfig());

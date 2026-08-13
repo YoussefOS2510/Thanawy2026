@@ -1,6 +1,6 @@
 export const DEFAULT_CONFIG = {
   maxEmployees: 5,
-  startingCash: 15000,
+  startingCash: 0,
   caseRevenues: {
     type1: 7500,
     type2: 10000,
@@ -16,57 +16,57 @@ export const DEFAULT_CONFIG = {
   },
   prices: {
     market1: {
-      empL1: 2000,
-      empL2: 3500,
-      empL3: 5000,
-      desk: 1000,
-      tv: 5000,
-      couch: 7500,
-      computer: 10000,
-      cert1: 2000,
-      cert2: 3500,
-      cert3: 5000,
-      cert4: 7500,
-      cert5: 10000
+      empL1: 0,
+      empL2: 0,
+      empL3: 0,
+      desk: 0,
+      tv: 0,
+      couch: 0,
+      computer: 0,
+      cert1: 0,
+      cert2: 0,
+      cert3: 0,
+      cert4: 0,
+      cert5: 0
     },
     market2: {
-      empL1: 3000,
-      empL2: 5000,
-      empL3: 7500,
-      desk: 1500,
-      tv: 7500,
-      couch: 11000,
-      computer: 15000,
-      cert1: 3000,
-      cert2: 5000,
-      cert3: 7500,
-      cert4: 11000,
-      cert5: 15000
+      empL1: 0,
+      empL2: 0,
+      empL3: 0,
+      desk: 0,
+      tv: 0,
+      couch: 0,
+      computer: 0,
+      cert1: 0,
+      cert2: 0,
+      cert3: 0,
+      cert4: 0,
+      cert5: 0
     },
     market3: {
-      empL1: 4500,
-      empL2: 7500,
-      empL3: 11000,
-      desk: 2000,
-      tv: 11000,
-      couch: 16000,
-      computer: 22000,
-      cert1: 4500,
-      cert2: 7500,
-      cert3: 11000,
-      cert4: 16000,
-      cert5: 22000
+      empL1: 0,
+      empL2: 0,
+      empL3: 0,
+      desk: 0,
+      tv: 0,
+      couch: 0,
+      computer: 0,
+      cert1: 0,
+      cert2: 0,
+      cert3: 0,
+      cert4: 0,
+      cert5: 0
     }
   }
 };
 
 export const DEFAULT_TEAMS = [
-  { id: "team1", name: "EL-Shawakish", color: "beige", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team2", name: "EL-MEZAN", color: "green", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team3", name: "EL-kalabshat", color: "turquoise", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team4", name: "EL-Ma7ader", color: "red", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team5", name: "EL-Karnihat", color: "purple", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team6", name: "EL-Malafat", color: "orange", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team7", name: "El-2ady", color: "yellow", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
-  { id: "team8", name: "El - Zenzana", color: "blue", cash: 15000, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] }
+  { id: "team1", name: "EL-Shawakish", color: "beige", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team2", name: "EL-MEZAN", color: "green", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team3", name: "EL-kalabshat", color: "turquoise", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team4", name: "EL-Ma7ader", color: "red", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team5", name: "EL-Karnihat", color: "purple", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team6", name: "EL-Malafat", color: "orange", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team7", name: "El-2ady", color: "yellow", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] },
+  { id: "team8", name: "El - Zenzana", color: "blue", profit: 0, cash: 0, assets: { empL1: 0, empL2: 0, empL3: 0, desks: 0, certLevel: 0, tvCharges: 0, couchCharges: 0, computerCharges: 0 }, casesLogged: { type1: 0, type2: 0, type3: 0 }, history: [] }
 ];

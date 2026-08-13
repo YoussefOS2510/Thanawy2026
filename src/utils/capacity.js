@@ -1,25 +1,131 @@
-export function getTotalEmployees(assets) {
+export function getTotalEmployees(assets = {}) {
   return (assets.empL1 || 0) + (assets.empL2 || 0) + (assets.empL3 || 0);
 }
 
-export function getTotalEmployeeCapacity(assets) {
+/**
+ * Calculates effective desk assignments.
+ * Prioritizes higher tier employees (L3 -> L2 -> L1) to available desks,
+ * while respecting any explicit assignments if defined.
+ */
+export function getEffectiveDeskAssignments(assets = {}) {
+  const totalL1 = Math.max(0, assets.empL1 || 0);
+  const totalL2 = Math.max(0, assets.empL2 || 0);
+  const totalL3 = Math.max(0, assets.empL3 || 0);
+  const totalDesks = Math.max(0, assets.desks || 0);
+
+  // If explicit assignments are provided, clamp them to valid ranges
+  if (
+    assets.assignedEmpL1 !== undefined ||
+    assets.assignedEmpL2 !== undefined ||
+    assets.assignedEmpL3 !== undefined
+  ) {
+    let assignedL3 = Math.min(totalL3, Math.max(0, assets.assignedEmpL3 || 0));
+    let remainingDesks = Math.max(0, totalDesks - assignedL3);
+
+    let assignedL2 = Math.min(totalL2, Math.max(0, assets.assignedEmpL2 || 0), remainingDesks);
+    remainingDesks = Math.max(0, remainingDesks - assignedL2);
+
+    let assignedL1 = Math.min(totalL1, Math.max(0, assets.assignedEmpL1 || 0), remainingDesks);
+
+    return {
+      assignedL1,
+      assignedL2,
+      assignedL3,
+      unassignedL1: totalL1 - assignedL1,
+      unassignedL2: totalL2 - assignedL2,
+      unassignedL3: totalL3 - assignedL3,
+      totalAssigned: assignedL1 + assignedL2 + assignedL3,
+      totalDesks,
+      isAuto: false
+    };
+  }
+
+  // Automatic optimal assignment: L3 -> L2 -> L1
+  let remainingDesks = totalDesks;
+
+  const assignedL3 = Math.min(totalL3, remainingDesks);
+  remainingDesks -= assignedL3;
+
+  const assignedL2 = Math.min(totalL2, remainingDesks);
+  remainingDesks -= assignedL2;
+
+  const assignedL1 = Math.min(totalL1, remainingDesks);
+  remainingDesks -= assignedL1;
+
+  return {
+    assignedL1,
+    assignedL2,
+    assignedL3,
+    unassignedL1: totalL1 - assignedL1,
+    unassignedL2: totalL2 - assignedL2,
+    unassignedL3: totalL3 - assignedL3,
+    totalAssigned: assignedL1 + assignedL2 + assignedL3,
+    totalDesks,
+    isAuto: true
+  };
+}
+
+export function getTotalEmployeeCapacity(assets = {}) {
   return (assets.empL1 || 0) * 1 + (assets.empL2 || 0) * 2 + (assets.empL3 || 0) * 3;
 }
 
-export function getWorkingCapacity(assets) {
-  const empCapacity = getTotalEmployeeCapacity(assets);
-  const desks = assets.desks || 0;
-  return Math.min(empCapacity, desks);
+/**
+ * Working capacity is calculated from employees assigned to desks.
+ * L1 at desk = 1 case, L2 at desk = 2 cases, L3 at desk = 3 cases.
+ */
+export function getWorkingCapacity(assets = {}) {
+  const { assignedL1, assignedL2, assignedL3 } = getEffectiveDeskAssignments(assets);
+  return (assignedL1 * 1) + (assignedL2 * 2) + (assignedL3 * 3);
 }
 
-export function getSolvableMarketCeiling(assets, certLimits) {
+export function getSolvableMarketCeiling(assets = {}, certLimits = {}) {
   const workingCapacity = getWorkingCapacity(assets);
   const certLevel = assets.certLevel || 0;
   const certLimit = certLimits[certLevel] !== undefined ? certLimits[certLevel] : 0;
   return Math.min(workingCapacity, certLimit);
 }
 
-export function validateCaseInputs(assets, certLimits, inputs) {
+/**
+ * Computes optimal case assignment based on capacity, cert limit, and consumable charges.
+ * Prioritizes Type 3 (highest revenue) -> Type 2 -> Type 1.
+ */
+export function calculateOptimalCases(assets = {}, certLimits = {}, caseRevenues = { type1: 7500, type2: 10000, type3: 15000 }) {
+  const ceiling = getSolvableMarketCeiling(assets, certLimits);
+  let remainingCapacity = ceiling;
+
+  const compCharges = Math.max(0, assets.computerCharges || 0);
+  const couchCharges = Math.max(0, assets.couchCharges || 0);
+  const tvCharges = Math.max(0, assets.tvCharges || 0);
+
+  // 1. Solve Type 3 first (highest revenue)
+  const solvedT3 = Math.min(remainingCapacity, compCharges);
+  remainingCapacity -= solvedT3;
+
+  // 2. Solve Type 2 second
+  const solvedT2 = Math.min(remainingCapacity, couchCharges);
+  remainingCapacity -= solvedT2;
+
+  // 3. Solve Type 1 third
+  const solvedT1 = Math.min(remainingCapacity, tvCharges);
+  remainingCapacity -= solvedT1;
+
+  const totalCases = solvedT1 + solvedT2 + solvedT3;
+  const totalProfit =
+    (solvedT1 * (caseRevenues.type1 || 7500)) +
+    (solvedT2 * (caseRevenues.type2 || 10000)) +
+    (solvedT3 * (caseRevenues.type3 || 15000));
+
+  return {
+    type1: solvedT1,
+    type2: solvedT2,
+    type3: solvedT3,
+    totalCases,
+    totalProfit,
+    ceiling
+  };
+}
+
+export function validateCaseInputs(assets = {}, certLimits = {}, inputs = {}) {
   const errors = {};
   const t1 = parseInt(inputs.type1 || 0, 10);
   const t2 = parseInt(inputs.type2 || 0, 10);
@@ -53,27 +159,10 @@ export function validateCaseInputs(assets, certLimits, inputs) {
   };
 }
 
-export function calculateNetWorth(team, config) {
-  let value = team.cash;
-  // Calculate value of permanent assets based on Market 1 prices (since they are permanent)
-  // Or we can just calculate them as purchase value. Let's use Market 1 prices as baseline
-  const prices = config.prices.market1;
-  value += (team.assets.empL1 || 0) * prices.empL1;
-  value += (team.assets.empL2 || 0) * prices.empL2;
-  value += (team.assets.empL3 || 0) * prices.empL3;
-  value += (team.assets.desks || 0) * prices.desk;
-  
-  // Certificates: add cost of all levels up to their current level
-  for (let i = 1; i <= (team.assets.certLevel || 0); i++) {
-    const key = `cert${i}`;
-    value += prices[key] || 0;
+export function calculateNetWorth(team) {
+  if (!team) return 0;
+  if (team.profit !== undefined && team.profit !== null) {
+    return Number(team.profit) || 0;
   }
-
-  // Consumables: add value of active charges
-  // (1/3 of the purchase price per charge)
-  value += Math.round(((team.assets.tvCharges || 0) / 3) * prices.tv);
-  value += Math.round(((team.assets.couchCharges || 0) / 3) * prices.couch);
-  value += Math.round(((team.assets.computerCharges || 0) / 3) * prices.computer);
-
-  return value;
+  return Number(team.cash) || 0;
 }

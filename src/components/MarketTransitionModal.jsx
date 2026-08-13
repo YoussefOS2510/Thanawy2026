@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { updateTeam, updateGameState, logActivity } from "../utils/db";
-import { calculateNetWorth } from "../utils/capacity";
-import { Play, TrendingUp, Award, ArrowRight, Home, Trophy } from "lucide-react";
+import { Play, TrendingUp, Award, ArrowRight, Trophy } from "lucide-react";
 
 export default function MarketTransitionModal({ isOpen, onClose, teams, config, currentMarket }) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const caseRevenues = config.caseRevenues;
+  const caseRevenues = config?.caseRevenues || { type1: 7500, type2: 10000, type3: 15000 };
 
   if (!isOpen) return null;
 
@@ -16,37 +15,32 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
     const assets = team.assets || {};
     const casesLogged = team.casesLogged || { type1: 0, type2: 0, type3: 0 };
     
-    // Starting cash for this market (if not recorded, fall back to current cash)
-    const startCash = team.marketStartCash !== undefined ? team.marketStartCash : config.startingCash;
-    
-    // Spent cash on purchases in this market = startCash - currentCash
-    const currentCash = team.cash || 0;
-    const investments = Math.max(0, startCash - currentCash);
+    // Starting profit for this market
+    const startProfit = team.profit !== undefined ? team.profit : (team.cash || 0);
     
     // Revenue earned from logged cases
-    const t1Revenue = (casesLogged.type1 || 0) * caseRevenues.type1;
-    const t2Revenue = (casesLogged.type2 || 0) * caseRevenues.type2;
-    const t3Revenue = (casesLogged.type3 || 0) * caseRevenues.type3;
+    const t1Revenue = (casesLogged.type1 || 0) * (caseRevenues.type1 || 7500);
+    const t2Revenue = (casesLogged.type2 || 0) * (caseRevenues.type2 || 10000);
+    const t3Revenue = (casesLogged.type3 || 0) * (caseRevenues.type3 || 15000);
     const revenue = t1Revenue + t2Revenue + t3Revenue;
     
-    const endingCash = currentCash + revenue;
-    const netWorth = calculateNetWorth({ ...team, cash: endingCash }, config);
+    const endingProfit = startProfit + revenue;
+    const totalCasesCount = (casesLogged.type1 || 0) + (casesLogged.type2 || 0) + (casesLogged.type3 || 0);
 
     return {
       teamId: team.id,
       name: team.name,
-      startCash,
-      investments,
+      startProfit,
       revenue,
-      endingCash,
-      netWorth,
+      endingProfit,
+      totalCasesCount,
       casesLogged: { ...casesLogged },
       assets: { ...assets }
     };
   });
 
-  // For final game over display, sort by net worth
-  const sortedFinalSummaries = [...summaries].sort((a, b) => b.netWorth - a.netWorth);
+  // For final game over display, sort by ending profit
+  const sortedFinalSummaries = [...summaries].sort((a, b) => b.endingProfit - a.endingProfit);
 
   const handleConfirmTransition = async () => {
     setIsProcessing(true);
@@ -63,19 +57,18 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
         // Create history record
         const historyRecord = {
           market: currentMarket,
-          startCash: summary.startCash,
-          investments: summary.investments,
-          revenue: summary.revenue,
-          endingCash: summary.endingCash,
+          startProfit: summary.startProfit,
+          roundProfit: summary.revenue,
+          endingProfit: summary.endingProfit,
           casesSolved: summary.casesLogged
         };
 
-        const updatedHistory = [...(teamObj.history || []), historyRecord];
+        const updatedHistory = [...(teamObj?.history || []), historyRecord];
 
         // Update team in db
         await updateTeam(summary.teamId, {
-          cash: summary.endingCash,
-          marketStartCash: summary.endingCash, // Starting cash for next market
+          profit: summary.endingProfit,
+          cash: summary.endingProfit, // sync fallback
           assets: {
             ...summary.assets,
             tvCharges: newTvCharges,
@@ -92,13 +85,13 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
         await updateGameState({
           isGameOver: true
         });
-        await logActivity(`Game Over. Market 3 completed. Final results computed.`);
+        await logActivity(`Game Over. Market 3 completed. Final profits computed.`);
       } else {
         const nextMkt = currentMarket + 1;
         await updateGameState({
           currentMarket: nextMkt
         });
-        await logActivity(`Transitioned to Market ${nextMkt}. Revenues distributed and case inputs reset.`);
+        await logActivity(`Transitioned to Market ${nextMkt}. Case profits added to teams.`);
       }
       
       onClose();
@@ -117,15 +110,15 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
         {/* Header */}
         <div className="border-b border-slate-800 p-6 bg-slate-950/30 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-indigo-500/10 p-2 text-indigo-400">
-              {isGameOverTransition ? <Trophy className="h-6 w-6 text-yellow-400" /> : <TrendingUp className="h-6 w-6 animate-pulse" />}
+            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-400">
+              {isGameOverTransition ? <Trophy className="h-6 w-6 text-yellow-400" /> : <TrendingUp className="h-6 w-6 animate-pulse text-emerald-400" />}
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">
-                {isGameOverTransition ? "Final Market 3 & Game Resolution" : `End of Market ${currentMarket} - Round Summary`}
+                {isGameOverTransition ? "Final Market 3 & Game Resolution" : `End of Market ${currentMarket} - Profit Summary`}
               </h2>
               <p className="text-sm text-slate-400">
-                {isGameOverTransition ? "Review overall performance and crown the winning firm." : `Approve revenues, update capital balances, and advance to Market ${currentMarket + 1}.`}
+                {isGameOverTransition ? "Review final profits and declare the winning firm." : `Approve round profits and advance to Market ${currentMarket + 1}.`}
               </p>
             </div>
           </div>
@@ -142,7 +135,7 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
                   {sortedFinalSummaries[0]?.name} is Victorious!
                 </h3>
                 <p className="text-slate-350 text-sm">
-                  With a final Net Worth of <strong className="text-emerald-400 font-mono">${sortedFinalSummaries[0]?.netWorth.toLocaleString()}</strong>, they have achieved legal supremacy.
+                  With a final Profit of <strong className="text-emerald-400 font-mono">${sortedFinalSummaries[0]?.endingProfit.toLocaleString()}</strong>, they have won the competition!
                 </p>
               </div>
             </div>
@@ -155,22 +148,24 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
                 <thead>
                   <tr className="bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     <th className="p-4">Firm Name</th>
-                    <th className="p-4 text-right">Start Cash</th>
-                    <th className="p-4 text-right text-rose-400">Investments</th>
-                    <th className="p-4 text-right text-emerald-400">Revenues</th>
-                    <th className="p-4 text-right text-white">Ending Cash</th>
-                    <th className="p-4 text-right text-indigo-400">Projected Net Worth</th>
+                    <th className="p-4 text-right">Start Profit</th>
+                    <th className="p-4 text-center">Cases Solved</th>
+                    <th className="p-4 text-right text-emerald-400">Round Profit</th>
+                    <th className="p-4 text-right text-white">Ending Total Profit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-850 text-sm">
                   {summaries.map((summary) => (
                     <tr key={summary.teamId} className="hover:bg-slate-900/40">
                       <td className="p-4 font-bold text-white">{summary.name}</td>
-                      <td className="p-4 text-right font-mono text-slate-400">${summary.startCash.toLocaleString()}</td>
-                      <td className="p-4 text-right font-mono text-rose-400">-${summary.investments.toLocaleString()}</td>
-                      <td className="p-4 text-right font-mono text-emerald-400">+${summary.revenue.toLocaleString()}</td>
-                      <td className="p-4 text-right font-mono font-extrabold text-white">${summary.endingCash.toLocaleString()}</td>
-                      <td className="p-4 text-right font-mono font-extrabold text-indigo-400">${summary.netWorth.toLocaleString()}</td>
+                      <td className="p-4 text-right font-mono text-slate-400">${summary.startProfit.toLocaleString()}</td>
+                      <td className="p-4 text-center font-mono text-slate-300">
+                        <span className="bg-slate-800 px-2 py-0.5 rounded text-xs">
+                          {summary.totalCasesCount} cases
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-mono text-emerald-400 font-bold">+${summary.revenue.toLocaleString()}</td>
+                      <td className="p-4 text-right font-mono font-extrabold text-emerald-300">${summary.endingProfit.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -191,7 +186,7 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
           <button
             onClick={handleConfirmTransition}
             disabled={isProcessing}
-            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 active:scale-95 transition"
+            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-600/25 active:scale-95 transition"
           >
             {isGameOverTransition ? (
               <>
