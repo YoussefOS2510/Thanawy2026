@@ -1,5 +1,4 @@
 export const DEFAULT_CONFIG = {
-  maxEmployees: 5,
   startingCash: 0,
   caseRevenues: {
     type1: 7500,
@@ -16,46 +15,46 @@ export const DEFAULT_CONFIG = {
   },
   prices: {
     market1: {
-      empL1: 0,
-      empL2: 0,
-      empL3: 0,
-      desk: 0,
-      tv: 0,
-      couch: 0,
-      computer: 0,
-      cert1: 0,
-      cert2: 0,
-      cert3: 0,
-      cert4: 0,
-      cert5: 0
+      empL1: 2000,
+      empL2: 3500,
+      empL3: 5000,
+      desk: 1000,
+      tv: 5000,
+      couch: 7500,
+      computer: 10000,
+      cert1: 2000,
+      cert2: 3500,
+      cert3: 5000,
+      cert4: 7500,
+      cert5: 10000
     },
     market2: {
-      empL1: 0,
-      empL2: 0,
-      empL3: 0,
-      desk: 0,
-      tv: 0,
-      couch: 0,
-      computer: 0,
-      cert1: 0,
-      cert2: 0,
-      cert3: 0,
-      cert4: 0,
-      cert5: 0
+      empL1: 3000,
+      empL2: 5000,
+      empL3: 7500,
+      desk: 1500,
+      tv: 7500,
+      couch: 11000,
+      computer: 15000,
+      cert1: 3000,
+      cert2: 5000,
+      cert3: 7500,
+      cert4: 11000,
+      cert5: 15000
     },
     market3: {
-      empL1: 0,
-      empL2: 0,
-      empL3: 0,
-      desk: 0,
-      tv: 0,
-      couch: 0,
-      computer: 0,
-      cert1: 0,
-      cert2: 0,
-      cert3: 0,
-      cert4: 0,
-      cert5: 0
+      empL1: 4500,
+      empL2: 7500,
+      empL3: 11000,
+      desk: 2000,
+      tv: 11000,
+      couch: 16000,
+      computer: 22000,
+      cert1: 4500,
+      cert2: 7500,
+      cert3: 11000,
+      cert4: 16000,
+      cert5: 22000
     }
   }
 };

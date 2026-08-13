@@ -25,7 +25,8 @@ import {
   TrendingUp,
   Zap,
   CheckCircle2,
-  Armchair
+  Armchair,
+  Tag
 } from "lucide-react";
 
 const COLOR_THEMES = {
@@ -39,10 +40,23 @@ const COLOR_THEMES = {
   blue: { border: "border-blue-500/40", text: "text-blue-400", bg: "bg-blue-400", badge: "bg-blue-500/10 text-blue-400 border-blue-500/30" }
 };
 
-export default function TeamCard({ team, config, onOverride }) {
-  const maxEmployees = config?.maxEmployees || 5;
+export default function TeamCard({ team, config, currentMarket = 1, onOverride }) {
   const certLimits = config?.certLimits || { 0: 0, 1: 3, 2: 5, 3: 8, 4: 12, 5: 18 };
   const caseRevenues = config?.caseRevenues || { type1: 7500, type2: 10000, type3: 15000 };
+  const currentPrices = config?.prices?.[`market${currentMarket}`] || {
+    empL1: 2000,
+    empL2: 3500,
+    empL3: 5000,
+    desk: 1000,
+    tv: 5000,
+    couch: 7500,
+    computer: 10000,
+    cert1: 2000,
+    cert2: 3500,
+    cert3: 5000,
+    cert4: 7500,
+    cert5: 10000
+  };
 
   const assets = team.assets || {
     empL1: 0,
@@ -109,28 +123,24 @@ export default function TeamCard({ team, config, onOverride }) {
     }
   };
 
-  // Add / Remove Asset (Free of charge, can buy employee without desk)
+  // Add / Remove Asset (Free of charge, unconstrained employee hiring)
   const handleModifyAsset = async (itemKey, delta, itemName) => {
     const updatedAssets = { ...assets };
 
     switch (itemKey) {
       case "empL1":
-        if (delta > 0 && totalEmployees >= maxEmployees) return;
         updatedAssets.empL1 = Math.max(0, (updatedAssets.empL1 || 0) + delta);
-        // Clean explicit desk assignment if employee count drops below assigned
         if (updatedAssets.assignedEmpL1 !== undefined) {
           updatedAssets.assignedEmpL1 = Math.min(updatedAssets.empL1, updatedAssets.assignedEmpL1);
         }
         break;
       case "empL2":
-        if (delta > 0 && totalEmployees >= maxEmployees) return;
         updatedAssets.empL2 = Math.max(0, (updatedAssets.empL2 || 0) + delta);
         if (updatedAssets.assignedEmpL2 !== undefined) {
           updatedAssets.assignedEmpL2 = Math.min(updatedAssets.empL2, updatedAssets.assignedEmpL2);
         }
         break;
       case "empL3":
-        if (delta > 0 && totalEmployees >= maxEmployees) return;
         updatedAssets.empL3 = Math.max(0, (updatedAssets.empL3 || 0) + delta);
         if (updatedAssets.assignedEmpL3 !== undefined) {
           updatedAssets.assignedEmpL3 = Math.min(updatedAssets.empL3, updatedAssets.assignedEmpL3);
@@ -246,7 +256,6 @@ export default function TeamCard({ team, config, onOverride }) {
         computerCharges: Math.max(0, (assets.computerCharges || 0) - optimalSolve.type3)
       };
 
-      // Reset cases logged since they are solved and collected immediately
       const historyRecord = {
         timestamp: Date.now(),
         type: "auto_solved",
@@ -317,9 +326,9 @@ export default function TeamCard({ team, config, onOverride }) {
     }
   };
 
-  // Limits checks
-  const isAtEmployeeLimit = totalEmployees >= maxEmployees;
   const unassignedStaffCount = totalEmployees - deskInfo.totalAssigned;
+  const nextCertLevel = Math.min(5, (assets.certLevel || 0) + 1);
+  const nextCertPrice = currentPrices[`cert${nextCertLevel}`] || 0;
 
   // Round Potential Revenue from manually logged cases
   const potentialProfit =
@@ -456,20 +465,13 @@ export default function TeamCard({ team, config, onOverride }) {
         <div className="grid grid-cols-2 gap-2.5 mb-3">
           {/* Staff Counter */}
           <div className="rounded-lg bg-slate-950/30 p-2.5 border border-slate-850">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <Users className="h-3.5 w-3.5 text-indigo-400" />
-                Staff Total
-              </span>
-              {isAtEmployeeLimit && (
-                <span className="text-[9px] bg-rose-500/10 text-rose-400 border border-rose-500/20 px-1.5 py-0.2 rounded font-bold uppercase">
-                  Max
-                </span>
-              )}
-            </div>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Users className="h-3.5 w-3.5 text-indigo-400" />
+              Staff Total
+            </span>
             <div className="flex justify-between items-end mt-1">
               <span className="text-base font-extrabold text-white font-mono">
-                {totalEmployees} <span className="text-xs text-slate-500 font-normal">/ {maxEmployees}</span>
+                {totalEmployees}
               </span>
               <span className="text-[10px] font-medium text-slate-400">
                 {deskInfo.totalAssigned} seated
@@ -671,18 +673,24 @@ export default function TeamCard({ team, config, onOverride }) {
           </div>
         </div>
 
-        {/* Resource Acquisition (Can buy employee freely without desk) */}
+        {/* Resource Acquisition & Market Store with Visible Prices */}
         <div className="mb-3 border-t border-slate-850 pt-2.5">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-            Hire Staff & Add Resources (Free)
-          </span>
+          <div className="flex justify-between items-center mb-1.5">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Tag className="h-3 w-3 text-indigo-400" />
+              Market {currentMarket} Store & Resources
+            </span>
+            <span className="text-[9px] text-slate-500 font-mono italic">Market Prices</span>
+          </div>
+
           <div className="grid grid-cols-2 gap-1.5 text-xs">
             
             {/* L1 Employee */}
             <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Emp L1</span>
-                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.empL1 || 0}</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.empL1 || 2000).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">({assets.empL1 || 0})</span>
               </div>
               <div className="flex items-center gap-1">
                 {(assets.empL1 || 0) > 0 && (
@@ -698,9 +706,8 @@ export default function TeamCard({ team, config, onOverride }) {
                 <button
                   type="button"
                   onClick={() => handleModifyAsset("empL1", 1, "Employee L1")}
-                  disabled={isAtEmployeeLimit}
-                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
-                  title="Hire Emp L1 (Can buy without desk)"
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Hire Emp L1"
                 >
                   <Plus className="h-2.5 w-2.5" />
                 </button>
@@ -711,7 +718,8 @@ export default function TeamCard({ team, config, onOverride }) {
             <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Emp L2</span>
-                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.empL2 || 0}</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.empL2 || 3500).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">({assets.empL2 || 0})</span>
               </div>
               <div className="flex items-center gap-1">
                 {(assets.empL2 || 0) > 0 && (
@@ -727,9 +735,8 @@ export default function TeamCard({ team, config, onOverride }) {
                 <button
                   type="button"
                   onClick={() => handleModifyAsset("empL2", 1, "Employee L2")}
-                  disabled={isAtEmployeeLimit}
-                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
-                  title="Hire Emp L2 (Can buy without desk)"
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Hire Emp L2"
                 >
                   <Plus className="h-2.5 w-2.5" />
                 </button>
@@ -740,7 +747,8 @@ export default function TeamCard({ team, config, onOverride }) {
             <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Emp L3</span>
-                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.empL3 || 0}</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.empL3 || 5000).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">({assets.empL3 || 0})</span>
               </div>
               <div className="flex items-center gap-1">
                 {(assets.empL3 || 0) > 0 && (
@@ -756,9 +764,8 @@ export default function TeamCard({ team, config, onOverride }) {
                 <button
                   type="button"
                   onClick={() => handleModifyAsset("empL3", 1, "Employee L3")}
-                  disabled={isAtEmployeeLimit}
-                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition disabled:opacity-30 disabled:hover:bg-transparent"
-                  title="Hire Emp L3 (Can buy without desk)"
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Hire Emp L3"
                 >
                   <Plus className="h-2.5 w-2.5" />
                 </button>
@@ -769,7 +776,8 @@ export default function TeamCard({ team, config, onOverride }) {
             <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Desk</span>
-                <span className="text-[9px] text-slate-500 font-mono">Count: {assets.desks || 0}</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.desk || 1000).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">({assets.desks || 0})</span>
               </div>
               <div className="flex items-center gap-1">
                 {(assets.desks || 0) > 0 && (
@@ -801,7 +809,8 @@ export default function TeamCard({ team, config, onOverride }) {
             >
               <div>
                 <span className="block font-bold text-[11px]">TV (T1)</span>
-                <span className="text-[9px] text-slate-500 font-mono">+3 Charges</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.tv || 5000).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">+3 Chg</span>
               </div>
               <Plus className="h-3 w-3 text-indigo-400" />
             </button>
@@ -814,7 +823,8 @@ export default function TeamCard({ team, config, onOverride }) {
             >
               <div>
                 <span className="block font-bold text-[11px]">Couch (T2)</span>
-                <span className="text-[9px] text-slate-500 font-mono">+3 Charges</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.couch || 7500).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">+3 Chg</span>
               </div>
               <Plus className="h-3 w-3 text-indigo-400" />
             </button>
@@ -827,7 +837,8 @@ export default function TeamCard({ team, config, onOverride }) {
             >
               <div>
                 <span className="block font-bold text-[11px]">Comp (T3)</span>
-                <span className="text-[9px] text-slate-500 font-mono">+3 Charges</span>
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.computer || 10000).toLocaleString()}</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">+3 Chg</span>
               </div>
               <Plus className="h-3 w-3 text-indigo-400" />
             </button>
@@ -836,9 +847,10 @@ export default function TeamCard({ team, config, onOverride }) {
             <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Certificate</span>
-                <span className="text-[9px] text-slate-500 font-mono">
-                  {assets.certLevel >= 5 ? "Max Lvl 5" : `Lvl ${assets.certLevel || 0}/5`}
+                <span className="text-[9px] text-emerald-400 font-mono font-semibold">
+                  {assets.certLevel >= 5 ? "Max" : `$${nextCertPrice.toLocaleString()}`}
                 </span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1.5">(L{assets.certLevel || 0})</span>
               </div>
               <div className="flex items-center gap-1">
                 {(assets.certLevel || 0) > 0 && (
@@ -866,8 +878,8 @@ export default function TeamCard({ team, config, onOverride }) {
           </div>
           
           {/* Informative Status Notes */}
-          <div className="mt-1.5 space-y-1">
-            {unassignedStaffCount > 0 && (
+          {unassignedStaffCount > 0 && (
+            <div className="mt-1.5">
               <p className="text-[10px] text-amber-400 flex items-center justify-between font-medium bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/10">
                 <span>{unassignedStaffCount} unseated staff member(s). Add desk or assign them to activate.</span>
                 <button
@@ -878,14 +890,8 @@ export default function TeamCard({ team, config, onOverride }) {
                   Assign
                 </button>
               </p>
-            )}
-            {isAtEmployeeLimit && (
-              <p className="text-[10px] text-slate-400 flex items-center gap-1 font-medium bg-slate-800/40 px-2 py-0.5 rounded border border-slate-700">
-                <AlertCircle className="h-3 w-3 shrink-0 text-slate-400" />
-                Reached max firm employee limit ({maxEmployees}).
-              </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
       </div>

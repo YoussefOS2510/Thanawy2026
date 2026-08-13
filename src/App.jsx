@@ -314,6 +314,7 @@ export default function App() {
                 key={team.id}
                 team={team}
                 config={config}
+                currentMarket={currentMarket}
                 onOverride={setActiveOverrideTeam}
               />
             ))}

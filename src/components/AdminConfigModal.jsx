@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { updateConfig, resetDatabaseToDefaults } from "../utils/db";
-import { Settings, RefreshCw, X, ShieldAlert, Award, DollarSign, Users } from "lucide-react";
+import { Settings, RefreshCw, X, ShieldAlert, Award, DollarSign } from "lucide-react";
 
 export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
   const [activeTab, setActiveTab] = useState("general");
@@ -10,7 +10,16 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
 
   useEffect(() => {
     if (gameConfig) {
-      setConfigState(JSON.parse(JSON.stringify(gameConfig)));
+      // Ensure prices object exists with defaults if missing
+      const cloned = JSON.parse(JSON.stringify(gameConfig));
+      if (!cloned.prices) {
+        cloned.prices = {
+          market1: { empL1: 2000, empL2: 3500, empL3: 5000, desk: 1000, tv: 5000, couch: 7500, computer: 10000, cert1: 2000, cert2: 3500, cert3: 5000, cert4: 7500, cert5: 10000 },
+          market2: { empL1: 3000, empL2: 5000, empL3: 7500, desk: 1500, tv: 7500, couch: 11000, computer: 15000, cert1: 3000, cert2: 5000, cert3: 7500, cert4: 11000, cert5: 15000 },
+          market3: { empL1: 4500, empL2: 7500, empL3: 11000, desk: 2000, tv: 11000, couch: 16000, computer: 22000, cert1: 4500, cert2: 7500, cert3: 11000, cert4: 16000, cert5: 22000 }
+        };
+      }
+      setConfigState(cloned);
     }
   }, [gameConfig, isOpen]);
 
@@ -21,6 +30,7 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
       const copy = { ...prev };
       let current = copy;
       for (let i = 0; i < path.length - 1; i++) {
+        if (!current[path[i]]) current[path[i]] = {};
         current = current[path[i]];
       }
       current[path[path.length - 1]] = Number(value);
@@ -58,9 +68,24 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
     }
   };
 
+  const priceItems = [
+    { key: "empL1", label: "Employee Level 1" },
+    { key: "empL2", label: "Employee Level 2" },
+    { key: "empL3", label: "Employee Level 3" },
+    { key: "desk", label: "Desk" },
+    { key: "tv", label: "TV (Type 1 Support)" },
+    { key: "couch", label: "Couch (Type 2 Support)" },
+    { key: "computer", label: "Computer (Type 3 Support)" },
+    { key: "cert1", label: "Certificate Level 1" },
+    { key: "cert2", label: "Certificate Level 2" },
+    { key: "cert3", label: "Certificate Level 3" },
+    { key: "cert4", label: "Certificate Level 4" },
+    { key: "cert5", label: "Certificate Level 5" },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="relative w-full max-w-4xl rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 p-6 bg-slate-900/50 backdrop-blur">
@@ -69,8 +94,8 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
               <Settings className="h-6 w-6" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white font-sans">Game Rules & Economics Configuration</h2>
-              <p className="text-sm text-slate-400">Configure case revenues, staff limits, and certificate capacities.</p>
+              <h2 className="text-xl font-bold text-white font-sans">Game Rules & Market Prices Configuration</h2>
+              <p className="text-sm text-slate-400">Customize case profits, certificate limits, and market prices for each round.</p>
             </div>
           </div>
           <button
@@ -82,10 +107,10 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6">
+        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 overflow-x-auto scrollbar-thin">
           <button
             onClick={() => setActiveTab("general")}
-            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all ${
+            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all whitespace-nowrap ${
               activeTab === "general"
                 ? "border-indigo-500 text-indigo-400 bg-indigo-500/5"
                 : "border-transparent text-slate-400 hover:text-slate-200"
@@ -94,8 +119,38 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
             General & Case Revenues
           </button>
           <button
+            onClick={() => setActiveTab("market1")}
+            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all whitespace-nowrap ${
+              activeTab === "market1"
+                ? "border-indigo-500 text-indigo-400 bg-indigo-500/5"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Market 1 Prices
+          </button>
+          <button
+            onClick={() => setActiveTab("market2")}
+            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all whitespace-nowrap ${
+              activeTab === "market2"
+                ? "border-indigo-500 text-indigo-400 bg-indigo-500/5"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Market 2 Prices
+          </button>
+          <button
+            onClick={() => setActiveTab("market3")}
+            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all whitespace-nowrap ${
+              activeTab === "market3"
+                ? "border-indigo-500 text-indigo-400 bg-indigo-500/5"
+                : "border-transparent text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            Market 3 Prices
+          </button>
+          <button
             onClick={() => setActiveTab("danger")}
-            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all ${
+            className={`border-b-2 py-3 px-4 text-sm font-semibold tracking-wide transition-all whitespace-nowrap ${
               activeTab === "danger"
                 ? "border-rose-500 text-rose-400 bg-rose-500/5"
                 : "border-transparent text-slate-400 hover:text-rose-400/80"
@@ -110,31 +165,13 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
           {activeTab === "general" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* General Settings */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-5 space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
-                  <Users className="h-4 w-4 text-indigo-400" />
-                  Staff Capacity Limits
-                </h3>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Max Firm Employee Limit</label>
-                  <input
-                    type="number"
-                    value={configState.maxEmployees || 5}
-                    onChange={(e) => handleNestedChange(["maxEmployees"], e.target.value)}
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">Default maximum total staff per firm.</p>
-                </div>
-              </div>
-
               {/* Case Revenues */}
-              <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-5 space-y-4">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-5 space-y-4 md:col-span-2">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
                   <DollarSign className="h-4 w-4 text-emerald-400" />
                   Case Profit / Revenues ($)
                 </h3>
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-400 mb-1">Type 1 Case Profit ($)</label>
                     <input
@@ -188,6 +225,37 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
             </div>
           )}
 
+          {activeTab.startsWith("market") && (
+            <div className="rounded-xl border border-slate-800 bg-slate-950/30 p-5 space-y-4 animate-fadeIn">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-slate-800 pb-2 flex justify-between items-center">
+                <span>{activeTab === "market1" ? "Market 1 Prices" : activeTab === "market2" ? "Market 2 Prices" : "Market 3 Prices"}</span>
+                <span className="text-xs text-slate-400 capitalize font-medium italic">Adjust market item prices</span>
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
+                {priceItems.map((item) => {
+                  const currentVal = configState.prices?.[activeTab]?.[item.key] !== undefined
+                    ? configState.prices[activeTab][item.key]
+                    : 0;
+                  return (
+                    <div key={item.key} className="flex flex-col">
+                      <label className="text-xs font-medium text-slate-400 mb-1">{item.label}</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 text-sm font-mono">$</span>
+                        <input
+                          type="number"
+                          value={currentVal}
+                          onChange={(e) => handleNestedChange(["prices", activeTab, item.key], e.target.value)}
+                          className="w-full pl-7 pr-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {activeTab === "danger" && (
             <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-6 space-y-4 animate-fadeIn">
               <div className="flex items-start gap-4">
@@ -197,7 +265,7 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold text-rose-400">Danger Zone: Factory Reset</h3>
                   <p className="text-sm text-slate-400">
-                    Executing a factory reset restores the game database to default. It resets the round to Market 1, clears history logs, and sets profit to $0 for all 8 firms.
+                    Executing a factory reset restores the game database to default. It resets the round to Market 1, clears history logs, resets prices to defaults, and sets profit to $0 for all 8 firms.
                   </p>
                 </div>
               </div>
