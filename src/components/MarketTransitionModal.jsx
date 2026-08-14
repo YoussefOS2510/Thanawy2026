@@ -1,10 +1,25 @@
 import React, { useState } from "react";
 import { updateTeam, updateGameState, logActivity } from "../utils/db";
 import { Play, TrendingUp, Award, ArrowRight, Trophy } from "lucide-react";
+import { calculateTotalSpend } from "../utils/capacity";
 
 export default function MarketTransitionModal({ isOpen, onClose, teams, config, currentMarket }) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const caseRevenues = config?.caseRevenues || { type1: 7500, type2: 10000, type3: 15000 };
+  const caseRevenues = config?.caseRevenues || { type1: 10000, type2: 15000, type3: 7500 };
+  const currentPrices = config?.prices?.[`market${currentMarket}`] || {
+    empL1: 2000,
+    empL2: 3500,
+    empL3: 5000,
+    desk: 1000,
+    tv: 5000,
+    couch: 7500,
+    computer: 10000,
+    cert1: 2000,
+    cert2: 3500,
+    cert3: 5000,
+    cert4: 7500,
+    cert5: 10000
+  };
 
   if (!isOpen) return null;
 
@@ -19,13 +34,14 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
     const startProfit = team.profit !== undefined ? team.profit : (team.cash || 0);
     
     // Revenue earned from logged cases
-    const t1Revenue = (casesLogged.type1 || 0) * (caseRevenues.type1 || 7500);
-    const t2Revenue = (casesLogged.type2 || 0) * (caseRevenues.type2 || 10000);
-    const t3Revenue = (casesLogged.type3 || 0) * (caseRevenues.type3 || 15000);
+    const t1Revenue = (casesLogged.type1 || 0) * (caseRevenues.type1 || 10000);
+    const t2Revenue = (casesLogged.type2 || 0) * (caseRevenues.type2 || 15000);
+    const t3Revenue = (casesLogged.type3 || 0) * (caseRevenues.type3 || 7500);
     const revenue = t1Revenue + t2Revenue + t3Revenue;
     
     const endingProfit = startProfit + revenue;
     const totalCasesCount = (casesLogged.type1 || 0) + (casesLogged.type2 || 0) + (casesLogged.type3 || 0);
+    const totalSpend = calculateTotalSpend(assets, currentPrices);
 
     return {
       teamId: team.id,
@@ -34,6 +50,7 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
       revenue,
       endingProfit,
       totalCasesCount,
+      totalSpend,
       casesLogged: { ...casesLogged },
       assets: { ...assets }
     };
@@ -149,6 +166,7 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
                   <tr className="bg-slate-950/80 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     <th className="p-4">Firm Name</th>
                     <th className="p-4 text-right">Start Profit</th>
+                    <th className="p-4 text-right text-amber-400">Total Asset Spend</th>
                     <th className="p-4 text-center">Cases Solved</th>
                     <th className="p-4 text-right text-emerald-400">Round Profit</th>
                     <th className="p-4 text-right text-white">Ending Total Profit</th>
@@ -159,6 +177,7 @@ export default function MarketTransitionModal({ isOpen, onClose, teams, config, 
                     <tr key={summary.teamId} className="hover:bg-slate-900/40">
                       <td className="p-4 font-bold text-white">{summary.name}</td>
                       <td className="p-4 text-right font-mono text-slate-400">${summary.startProfit.toLocaleString()}</td>
+                      <td className="p-4 text-right font-mono text-amber-400 font-semibold">${summary.totalSpend.toLocaleString()}</td>
                       <td className="p-4 text-center font-mono text-slate-300">
                         <span className="bg-slate-800 px-2 py-0.5 rounded text-xs">
                           {summary.totalCasesCount} cases

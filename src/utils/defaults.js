@@ -1,9 +1,9 @@
 export const DEFAULT_CONFIG = {
   startingCash: 0,
   caseRevenues: {
-    type1: 7500,
-    type2: 10000,
-    type3: 15000
+    type1: 10000,
+    type2: 15000,
+    type3: 7500
   },
   certLimits: {
     0: 0,

@@ -1,5 +1,6 @@
 import React from "react";
 import { TrendingUp, Trophy } from "lucide-react";
+import { calculateTotalSpend } from "../utils/capacity";
 
 const COLOR_BADGES = {
   beige: "bg-amber-400/20 text-amber-200 border-amber-400/30",
@@ -12,7 +13,22 @@ const COLOR_BADGES = {
   blue: "bg-blue-500/20 text-blue-400 border-blue-500/30"
 };
 
-export default function Leaderboard({ teams }) {
+export default function Leaderboard({ teams, config, currentMarket = 1 }) {
+  const currentPrices = config?.prices?.[`market${currentMarket}`] || {
+    empL1: 2000,
+    empL2: 3500,
+    empL3: 5000,
+    desk: 1000,
+    tv: 5000,
+    couch: 7500,
+    computer: 10000,
+    cert1: 2000,
+    cert2: 3500,
+    cert3: 5000,
+    cert4: 7500,
+    cert5: 10000
+  };
+
   // Sort teams based on profit
   const sortedTeams = [...teams].sort((a, b) => {
     const profitB = b.profit !== undefined ? b.profit : (b.cash || 0);
@@ -50,6 +66,7 @@ export default function Leaderboard({ teams }) {
       <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[350px] lg:max-h-none scrollbar-thin">
         {sortedTeams.map((team, index) => {
           const profitVal = team.profit !== undefined ? team.profit : (team.cash || 0);
+          const totalSpend = calculateTotalSpend(team.assets, currentPrices);
           const isTop3 = index < 3;
 
           return (
@@ -88,13 +105,13 @@ export default function Leaderboard({ teams }) {
                 </div>
               </div>
 
-              {/* Profit display */}
+              {/* Profit & Spend display */}
               <div className="text-right shrink-0">
                 <span className={`text-sm font-extrabold font-mono block ${profitVal >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                   {profitVal >= 0 ? `$${profitVal.toLocaleString()}` : `-$${Math.abs(profitVal).toLocaleString()}`}
                 </span>
-                <span className="text-[9px] text-slate-500 font-mono">
-                  total profit
+                <span className="text-[9px] text-amber-400 font-mono block">
+                  Spent: ${totalSpend.toLocaleString()}
                 </span>
               </div>
             </div>

@@ -6,7 +6,8 @@ import {
   getWorkingCapacity,
   getSolvableMarketCeiling,
   calculateOptimalCases,
-  validateCaseInputs
+  validateCaseInputs,
+  calculateTotalSpend
 } from "../utils/capacity";
 import {
   Users,
@@ -26,7 +27,8 @@ import {
   Zap,
   CheckCircle2,
   Armchair,
-  Tag
+  Tag,
+  ShoppingBag
 } from "lucide-react";
 
 const COLOR_THEMES = {
@@ -42,7 +44,7 @@ const COLOR_THEMES = {
 
 export default function TeamCard({ team, config, currentMarket = 1, onOverride }) {
   const certLimits = config?.certLimits || { 0: 0, 1: 3, 2: 5, 3: 8, 4: 12, 5: 18 };
-  const caseRevenues = config?.caseRevenues || { type1: 7500, type2: 10000, type3: 15000 };
+  const caseRevenues = config?.caseRevenues || { type1: 10000, type2: 15000, type3: 7500 };
   const currentPrices = config?.prices?.[`market${currentMarket}`] || {
     empL1: 2000,
     empL2: 3500,
@@ -77,6 +79,7 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
   const deskInfo = getEffectiveDeskAssignments(assets);
   const workingCapacity = getWorkingCapacity(assets);
   const solvableCeiling = getSolvableMarketCeiling(assets, certLimits);
+  const totalSpend = calculateTotalSpend(assets, currentPrices);
 
   const [localCases, setLocalCases] = useState(team.casesLogged || { type1: 0, type2: 0, type3: 0 });
   const [isSaving, setIsSaving] = useState(false);
@@ -171,8 +174,9 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
       await updateTeam(team.id, {
         assets: updatedAssets
       });
+      const newTotalSpend = calculateTotalSpend(updatedAssets, currentPrices);
       await logActivity(
-        `"${team.name}" ${delta > 0 ? "added" : "removed"} ${itemName}.`
+        `"${team.name}" ${delta > 0 ? "bought/added" : "removed"} ${itemName}. (Total Spend: $${newTotalSpend.toLocaleString()})`
       );
     } catch (err) {
       console.error(err);
@@ -332,9 +336,9 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
 
   // Round Potential Revenue from manually logged cases
   const potentialProfit =
-    (localCases.type1 || 0) * (caseRevenues.type1 || 7500) +
-    (localCases.type2 || 0) * (caseRevenues.type2 || 10000) +
-    (localCases.type3 || 0) * (caseRevenues.type3 || 15000);
+    (localCases.type1 || 0) * (caseRevenues.type1 || 10000) +
+    (localCases.type2 || 0) * (caseRevenues.type2 || 15000) +
+    (localCases.type3 || 0) * (caseRevenues.type3 || 7500);
 
   // Color Theme definitions
   const theme = COLOR_THEMES[team.color] || {
@@ -372,7 +376,7 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
           </button>
         </div>
 
-        {/* Total Profit Display Banner */}
+        {/* Total Profit & Total Spend Display Banner */}
         <div className="mb-4 rounded-xl bg-slate-950/70 border border-slate-800 p-3">
           <div className="flex justify-between items-center mb-2">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -381,6 +385,16 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
             </span>
             <span className={`text-2xl font-black font-mono tracking-tight ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {profit >= 0 ? `$${profit.toLocaleString()}` : `-$${Math.abs(profit).toLocaleString()}`}
+            </span>
+          </div>
+
+          <div className="flex justify-between items-center pb-2 border-b border-slate-850/80 mb-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <ShoppingBag className="h-3 w-3 text-amber-400" />
+              Total Asset Spend
+            </span>
+            <span className="text-xs font-bold font-mono text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded">
+              ${totalSpend.toLocaleString()}
             </span>
           </div>
 
@@ -680,7 +694,9 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
               <Tag className="h-3 w-3 text-indigo-400" />
               Market {currentMarket} Store & Resources
             </span>
-            <span className="text-[9px] text-slate-500 font-mono italic">Market Prices</span>
+            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded flex items-center gap-1 font-mono">
+              <ShoppingBag className="h-3 w-3" /> Spent: ${totalSpend.toLocaleString()}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-1.5 text-xs">
@@ -801,47 +817,92 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
               </div>
             </div>
 
-            {/* TV (+3) */}
-            <button
-              type="button"
-              onClick={() => handleModifyAsset("tv", 1, "TV (3 Charges)")}
-              className="flex items-center justify-between p-1.5 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition text-left"
-            >
+            {/* TV (T1) */}
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">TV (T1)</span>
                 <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.tv || 5000).toLocaleString()}</span>
-                <span className="text-[9px] text-slate-500 font-mono ml-1.5">+3 Chg</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1">({assets.tvCharges || 0} chg)</span>
               </div>
-              <Plus className="h-3 w-3 text-indigo-400" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.tvCharges || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("tv", -1, "TV")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove TV (-3 Charges)"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("tv", 1, "TV (3 Charges)")}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Buy TV (+3 Charges)"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
-            {/* Couch (+3) */}
-            <button
-              type="button"
-              onClick={() => handleModifyAsset("couch", 1, "Couch (3 Charges)")}
-              className="flex items-center justify-between p-1.5 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition text-left"
-            >
+            {/* Couch (T2) */}
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Couch (T2)</span>
                 <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.couch || 7500).toLocaleString()}</span>
-                <span className="text-[9px] text-slate-500 font-mono ml-1.5">+3 Chg</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1">({assets.couchCharges || 0} chg)</span>
               </div>
-              <Plus className="h-3 w-3 text-indigo-400" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.couchCharges || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("couch", -1, "Couch")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove Couch (-3 Charges)"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("couch", 1, "Couch (3 Charges)")}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Buy Couch (+3 Charges)"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
-            {/* Computer (+3) */}
-            <button
-              type="button"
-              onClick={() => handleModifyAsset("computer", 1, "Computer (3 Charges)")}
-              className="flex items-center justify-between p-1.5 rounded-lg border border-slate-800 bg-slate-950/40 hover:border-indigo-500 text-white active:scale-95 transition text-left"
-            >
+            {/* Computer (T3) */}
+            <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
               <div>
                 <span className="block font-bold text-[11px]">Comp (T3)</span>
                 <span className="text-[9px] text-emerald-400 font-mono font-semibold">${(currentPrices.computer || 10000).toLocaleString()}</span>
-                <span className="text-[9px] text-slate-500 font-mono ml-1.5">+3 Chg</span>
+                <span className="text-[9px] text-slate-500 font-mono ml-1">({assets.computerCharges || 0} chg)</span>
               </div>
-              <Plus className="h-3 w-3 text-indigo-400" />
-            </button>
+              <div className="flex items-center gap-1">
+                {(assets.computerCharges || 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleModifyAsset("computer", -1, "Computer")}
+                    className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                    title="Remove Computer (-3 Charges)"
+                  >
+                    <Minus className="h-2.5 w-2.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleModifyAsset("computer", 1, "Computer (3 Charges)")}
+                  className="p-1 rounded bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white transition"
+                  title="Buy Computer (+3 Charges)"
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            </div>
 
             {/* Certificate */}
             <div className="flex items-center justify-between p-1.5 rounded-lg border bg-slate-950/40 border-slate-800 text-white">
@@ -968,9 +1029,9 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
                 min="0"
               />
               <span className="text-slate-600 text-xs">x</span>
-              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type1 || 7500).toLocaleString()}</span>
+              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type1 || 10000).toLocaleString()}</span>
               <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-                +${((localCases.type1 || 0) * (caseRevenues.type1 || 7500)).toLocaleString()}
+                +${((localCases.type1 || 0) * (caseRevenues.type1 || 10000)).toLocaleString()}
               </span>
             </div>
 
@@ -984,9 +1045,9 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
                 min="0"
               />
               <span className="text-slate-600 text-xs">x</span>
-              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type2 || 10000).toLocaleString()}</span>
+              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type2 || 15000).toLocaleString()}</span>
               <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-                +${((localCases.type2 || 0) * (caseRevenues.type2 || 10000)).toLocaleString()}
+                +${((localCases.type2 || 0) * (caseRevenues.type2 || 15000)).toLocaleString()}
               </span>
             </div>
 
@@ -1000,9 +1061,9 @@ export default function TeamCard({ team, config, currentMarket = 1, onOverride }
                 min="0"
               />
               <span className="text-slate-600 text-xs">x</span>
-              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type3 || 15000).toLocaleString()}</span>
+              <span className="text-[11px] text-slate-400 font-mono">${(caseRevenues.type3 || 7500).toLocaleString()}</span>
               <span className="ml-auto text-xs text-emerald-400/80 font-semibold font-mono">
-                +${((localCases.type3 || 0) * (caseRevenues.type3 || 15000)).toLocaleString()}
+                +${((localCases.type3 || 0) * (caseRevenues.type3 || 7500)).toLocaleString()}
               </span>
             </div>
           </div>

@@ -58,10 +58,11 @@ export function clearFirebaseConfig() {
 
 // Demo Mode Helpers
 export function isDemoMode() {
+  const envHasConfig = !!(import.meta.env.VITE_FIREBASE_API_KEY && import.meta.env.VITE_FIREBASE_PROJECT_ID);
   const explicit = localStorage.getItem(DEMO_MODE_KEY);
   if (explicit === "true") return true;
   if (explicit === "false") return false;
-  // If not explicitly configured, default to demo mode if no valid Firebase config exists
+  if (envHasConfig) return false;
   const cfg = getSavedFirebaseConfig();
   const validConfig = cfg && cfg.apiKey && (cfg.projectId || cfg.databaseURL);
   return !validConfig;
@@ -289,16 +290,20 @@ export async function resetDatabaseToDefaults() {
     }
   };
 
-  if (db) {
-    console.log("[RTDB] Writing default data to Realtime Database node 'suits-scoring'...");
-    await set(ref(db, "suits-scoring"), defaultData);
-    console.log("[RTDB] Successfully initialized Realtime Database!");
-  }
-
   if (firestoreDb) {
     console.log("[Firestore] Writing default data to Cloud Firestore document 'suits-scoring/game'...");
     await setDoc(doc(firestoreDb, "suits-scoring", "game"), defaultData);
     console.log("[Firestore] Successfully initialized Firestore!");
+  }
+
+  if (db) {
+    try {
+      console.log("[RTDB] Writing default data to Realtime Database node 'suits-scoring'...");
+      await set(ref(db, "suits-scoring"), defaultData);
+      console.log("[RTDB] Successfully initialized Realtime Database!");
+    } catch (e) {
+      console.warn("[RTDB] Reset skipped (RTDB not provisioned):", e.message);
+    }
   }
 }
 
@@ -317,13 +322,6 @@ export async function updateTeam(teamId, updates) {
 
   if (!db && !firestoreDb) throw new Error("Firebase is not initialized");
 
-  if (db) {
-    console.log(`[RTDB] Updating team ${teamId} in Realtime Database...`);
-    const teamRef = ref(db, `suits-scoring/teams/${teamId}`);
-    await update(teamRef, updates);
-    console.log(`[RTDB] Successfully updated team ${teamId}!`);
-  }
-
   if (firestoreDb) {
     console.log(`[Firestore] Updating team ${teamId} in Cloud Firestore...`);
     await setDoc(doc(firestoreDb, "suits-scoring", "game"), {
@@ -332,6 +330,17 @@ export async function updateTeam(teamId, updates) {
       }
     }, { merge: true });
     console.log(`[Firestore] Successfully updated team ${teamId}!`);
+  }
+
+  if (db) {
+    try {
+      console.log(`[RTDB] Updating team ${teamId} in Realtime Database...`);
+      const teamRef = ref(db, `suits-scoring/teams/${teamId}`);
+      await update(teamRef, updates);
+      console.log(`[RTDB] Successfully updated team ${teamId}!`);
+    } catch (e) {
+      console.warn("[RTDB] Team update skipped (RTDB not provisioned):", e.message);
+    }
   }
 }
 
@@ -356,13 +365,17 @@ export async function updateGameState(updates) {
     lastUpdated: Date.now()
   };
 
-  if (db) {
-    const stateRef = ref(db, "suits-scoring/gameState");
-    await update(stateRef, payload);
-  }
-
   if (firestoreDb) {
     await setDoc(doc(firestoreDb, "suits-scoring", "game"), { gameState: payload }, { merge: true });
+  }
+
+  if (db) {
+    try {
+      const stateRef = ref(db, "suits-scoring/gameState");
+      await update(stateRef, payload);
+    } catch (e) {
+      console.warn("[RTDB] GameState update skipped:", e.message);
+    }
   }
 }
 
@@ -381,13 +394,17 @@ export async function updateConfig(updates) {
 
   if (!db && !firestoreDb) throw new Error("Firebase is not initialized");
 
-  if (db) {
-    const configRef = ref(db, "suits-scoring/config");
-    await update(configRef, updates);
-  }
-
   if (firestoreDb) {
     await setDoc(doc(firestoreDb, "suits-scoring", "game"), { config: updates }, { merge: true });
+  }
+
+  if (db) {
+    try {
+      const configRef = ref(db, "suits-scoring/config");
+      await update(configRef, updates);
+    } catch (e) {
+      console.warn("[RTDB] Config update skipped:", e.message);
+    }
   }
 }
 
@@ -414,15 +431,6 @@ export async function logActivity(message) {
     message
   };
 
-  if (db) {
-    try {
-      const logsRef = ref(db, "suits-scoring/logs");
-      await push(logsRef, logEntry);
-    } catch (e) {
-      console.warn("RTDB logActivity error:", e);
-    }
-  }
-
   if (firestoreDb) {
     try {
       await setDoc(doc(firestoreDb, "suits-scoring", "game"), {
@@ -432,6 +440,15 @@ export async function logActivity(message) {
       }, { merge: true });
     } catch (e) {
       console.warn("Firestore logActivity error:", e);
+    }
+  }
+
+  if (db) {
+    try {
+      const logsRef = ref(db, "suits-scoring/logs");
+      await push(logsRef, logEntry);
+    } catch (e) {
+      console.warn("RTDB logActivity error:", e);
     }
   }
 }

@@ -85,40 +85,76 @@ export function getSolvableMarketCeiling(assets = {}, certLimits = {}) {
   return Math.min(workingCapacity, certLimit);
 }
 
+export function calculateTotalSpend(assets = {}, prices = {}) {
+  if (!assets || !prices) return 0;
+
+  const empL1Cost = (assets.empL1 || 0) * (prices.empL1 || 0);
+  const empL2Cost = (assets.empL2 || 0) * (prices.empL2 || 0);
+  const empL3Cost = (assets.empL3 || 0) * (prices.empL3 || 0);
+  const deskCost = (assets.desks || 0) * (prices.desk || 0);
+
+  const tvUnits = Math.ceil((assets.tvCharges || 0) / 3);
+  const couchUnits = Math.ceil((assets.couchCharges || 0) / 3);
+  const compUnits = Math.ceil((assets.computerCharges || 0) / 3);
+
+  const tvCost = tvUnits * (prices.tv || 0);
+  const couchCost = couchUnits * (prices.couch || 0);
+  const compCost = compUnits * (prices.computer || 0);
+
+  let certCost = 0;
+  const certLvl = assets.certLevel || 0;
+  for (let i = 1; i <= certLvl; i++) {
+    certCost += prices[`cert${i}`] || 0;
+  }
+
+  return empL1Cost + empL2Cost + empL3Cost + deskCost + tvCost + couchCost + compCost + certCost;
+}
+
 /**
  * Computes optimal case assignment based on capacity, cert limit, and consumable charges.
- * Prioritizes Type 3 (highest revenue) -> Type 2 -> Type 1.
+ * Prioritizes highest revenue cases first based on caseRevenues.
  */
-export function calculateOptimalCases(assets = {}, certLimits = {}, caseRevenues = { type1: 7500, type2: 10000, type3: 15000 }) {
+export function calculateOptimalCases(
+  assets = {},
+  certLimits = {},
+  caseRevenues = { type1: 10000, type2: 15000, type3: 7500 }
+) {
   const ceiling = getSolvableMarketCeiling(assets, certLimits);
   let remainingCapacity = ceiling;
 
-  const compCharges = Math.max(0, assets.computerCharges || 0);
-  const couchCharges = Math.max(0, assets.couchCharges || 0);
-  const tvCharges = Math.max(0, assets.tvCharges || 0);
+  const revs = {
+    type1: caseRevenues.type1 || 10000,
+    type2: caseRevenues.type2 || 15000,
+    type3: caseRevenues.type3 || 7500
+  };
 
-  // 1. Solve Type 3 first (highest revenue)
-  const solvedT3 = Math.min(remainingCapacity, compCharges);
-  remainingCapacity -= solvedT3;
+  const chargesMap = {
+    type1: Math.max(0, assets.tvCharges || 0),
+    type2: Math.max(0, assets.couchCharges || 0),
+    type3: Math.max(0, assets.computerCharges || 0)
+  };
 
-  // 2. Solve Type 2 second
-  const solvedT2 = Math.min(remainingCapacity, couchCharges);
-  remainingCapacity -= solvedT2;
+  // Sort types by highest revenue descending
+  const sortedTypes = ["type1", "type2", "type3"].sort((a, b) => revs[b] - revs[a]);
 
-  // 3. Solve Type 1 third
-  const solvedT1 = Math.min(remainingCapacity, tvCharges);
-  remainingCapacity -= solvedT1;
+  const solved = { type1: 0, type2: 0, type3: 0 };
 
-  const totalCases = solvedT1 + solvedT2 + solvedT3;
+  for (const type of sortedTypes) {
+    const num = Math.min(remainingCapacity, chargesMap[type]);
+    solved[type] = num;
+    remainingCapacity -= num;
+  }
+
+  const totalCases = solved.type1 + solved.type2 + solved.type3;
   const totalProfit =
-    (solvedT1 * (caseRevenues.type1 || 7500)) +
-    (solvedT2 * (caseRevenues.type2 || 10000)) +
-    (solvedT3 * (caseRevenues.type3 || 15000));
+    (solved.type1 * revs.type1) +
+    (solved.type2 * revs.type2) +
+    (solved.type3 * revs.type3);
 
   return {
-    type1: solvedT1,
-    type2: solvedT2,
-    type3: solvedT3,
+    type1: solved.type1,
+    type2: solved.type2,
+    type3: solved.type3,
     totalCases,
     totalProfit,
     ceiling

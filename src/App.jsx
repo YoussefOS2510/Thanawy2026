@@ -326,7 +326,7 @@ export default function App() {
           <div className="flex-1 flex flex-col justify-between gap-6">
             {/* Leaderboard Panel */}
             <div className="flex-1">
-              <Leaderboard teams={teamsList} />
+              <Leaderboard teams={teamsList} config={config} currentMarket={currentMarket} />
             </div>
             
             {/* Activity Logs Terminal */}

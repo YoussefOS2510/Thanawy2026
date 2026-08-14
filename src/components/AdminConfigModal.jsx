@@ -173,28 +173,28 @@ export default function AdminConfigModal({ isOpen, onClose, gameConfig }) {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Type 1 Case Profit ($)</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Type 1 Case Profit (TV: $10k)</label>
                     <input
                       type="number"
-                      value={configState.caseRevenues?.type1 || 7500}
+                      value={configState.caseRevenues?.type1 || 10000}
                       onChange={(e) => handleNestedChange(["caseRevenues", "type1"], e.target.value)}
                       className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Type 2 Case Profit ($)</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Type 2 Case Profit (Couch: $15k)</label>
                     <input
                       type="number"
-                      value={configState.caseRevenues?.type2 || 10000}
+                      value={configState.caseRevenues?.type2 || 15000}
                       onChange={(e) => handleNestedChange(["caseRevenues", "type2"], e.target.value)}
                       className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1">Type 3 Case Profit ($)</label>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1">Type 3 Case Profit (Comp: $7.5k)</label>
                     <input
                       type="number"
-                      value={configState.caseRevenues?.type3 || 15000}
+                      value={configState.caseRevenues?.type3 || 7500}
                       onChange={(e) => handleNestedChange(["caseRevenues", "type3"], e.target.value)}
                       className="w-full rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-white focus:border-indigo-500 focus:outline-none font-mono"
                     />
